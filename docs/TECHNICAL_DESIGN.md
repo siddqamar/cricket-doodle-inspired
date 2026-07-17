@@ -1,6 +1,6 @@
 # Phase 2 — Technical Design: Pitch Bugs
 
-A static, GitHub Pages–ready recreation of the *gameplay feel* of Google’s 2017 Cricket Doodle, using original art and code.
+A static, GitHub Pages–ready one-button cricket arcade built with original art and code.
 
 ---
 
@@ -328,4 +328,4 @@ No SSR, no API routes.
 - [ ] Mouse, keyboard, touch  
 - [ ] 60 FPS feel on desktop  
 - [ ] Static `dist/` works offline after load  
-- [ ] No third-party Google assets  
+- [ ] Fully original art and audio 

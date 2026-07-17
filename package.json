@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Original insect cricket arcade game — gameplay inspired by the feel of Google's 2017 Cricket Doodle (no original assets used).",
+  "description": "Pitch Bugs — a cute insect cricket arcade game for the browser (Canvas, TypeScript, Vite).",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

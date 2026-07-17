@@ -1,8 +1,8 @@
 # Pitch Bugs
 
-An original browser cricket mini-game inspired by the *feel* of Google’s 2017 Champions Trophy Cricket Doodle — **not** a copy of Google’s assets, art, audio, or code.
+A cute insect cricket arcade game for the browser. Time your swing, send the ball to the boundary, and chase a high score before the fielding beetles take your wicket.
 
-Time your swing, send the ball to the boundary, and chase a high score before the fielding beetles take your wicket.
+Built with original art, audio, and code — HTML5 Canvas, TypeScript, and Vite. Static site, no backend.
 
 ## Play locally
 
@@ -45,7 +45,7 @@ Deploy `dist/` with GitHub Pages (branch or Actions). No backend required.
 ## Project layout
 
 ```
-docs/RESEARCH.md           Phase 1 research notes
+docs/RESEARCH.md           Phase 1 design research notes
 docs/TECHNICAL_DESIGN.md   Phase 2 technical design
 src/engine/                Game loop, input, camera
 src/entities/              VFX helpers
@@ -57,10 +57,6 @@ src/config/                Constants
 src/utils/                 Math, storage
 ```
 
-## Learning project notice
-
-This repository is for education and portfolio practice. Gameplay mechanics are recreated independently from public descriptions of the 2017 doodle. Do not treat this as affiliated with Google.
-
 ## License
 
-Code and original art in this repo: MIT (see `LICENSE` if present). Google trademarks and doodle assets remain Google’s property and are not included.
+See `LICENSE` in this repository.

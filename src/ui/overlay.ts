@@ -129,7 +129,7 @@ export class Overlay {
     panel.className = 'panel';
     panel.innerHTML = `
       <h1>Pitch Bugs</h1>
-      <p class="tagline">Cute insect cricket. One swing. Endless runs.<br/>Original art &amp; audio — learning project.</p>
+      <p class="tagline">Cute insect cricket. One swing. Endless runs.</p>
       <p class="meta">Best: ${this.lastHigh}</p>
     `;
     const row = document.createElement('div');
