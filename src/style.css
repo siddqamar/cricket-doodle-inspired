@@ -1,0 +1,229 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f2a1a;
+  --panel: rgba(12, 40, 24, 0.92);
+  --panel-border: rgba(244, 211, 94, 0.45);
+  --text: #f6fff8;
+  --muted: #b7d4c2;
+  --accent: #f4d35e;
+  --accent-2: #52b788;
+  --danger: #e76f51;
+  --btn: #2d6a4f;
+  --btn-hover: #40916c;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 20%, #1b4332 0%, var(--bg) 70%);
+  color: var(--text);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+#game-shell {
+  position: relative;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  max-width: 100%;
+  max-height: 100%;
+  box-shadow: var(--shadow);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #123524;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.ui-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+}
+
+.ui-root > * {
+  pointer-events: auto;
+}
+
+.panel {
+  width: min(92%, 420px);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  padding: 1.35rem 1.4rem 1.5rem;
+  box-shadow: var(--shadow);
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+.panel h1 {
+  font-size: clamp(1.6rem, 5vw, 2.2rem);
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+
+.panel .tagline {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.panel .score-big {
+  font-size: clamp(2.2rem, 8vw, 3.2rem);
+  font-weight: 800;
+  color: var(--accent);
+  margin: 0.4rem 0 0.2rem;
+}
+
+.panel .meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+button.btn {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.72rem 1.25rem;
+  min-height: 44px;
+  min-width: 44px;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #082015;
+  background: linear-gradient(180deg, #ffe08a, var(--accent));
+  cursor: pointer;
+  box-shadow: 0 4px 0 #c9a227;
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+
+button.btn:hover {
+  filter: brightness(1.05);
+}
+
+button.btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #c9a227;
+}
+
+button.btn.secondary {
+  color: var(--text);
+  background: linear-gradient(180deg, #52b788, var(--btn));
+  box-shadow: 0 4px 0 #1b4332;
+}
+
+button.btn.ghost {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: none;
+}
+
+.instructions {
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.instructions li {
+  margin-left: 1.1rem;
+  margin-bottom: 0.35rem;
+}
+
+.hud-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 3.5%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(0.75rem, 2.2vw, 0.9rem);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.top-controls {
+  position: absolute;
+  top: 2.5%;
+  right: 2%;
+  display: flex;
+  gap: 0.4rem;
+  pointer-events: auto;
+}
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(8, 32, 21, 0.55);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(4px);
+}
+
+.icon-btn:hover {
+  background: rgba(8, 32, 21, 0.8);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.btn {
+    transition: none;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+  #game-shell {
+    width: min(100vw, calc(100vh * 16 / 9));
+    height: min(100vh, calc(100vw * 9 / 16));
+    border-radius: 0;
+  }
+}
