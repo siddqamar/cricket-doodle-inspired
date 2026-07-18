@@ -1,4 +1,4 @@
-/** Logical design resolution (letterboxed to any screen). */
+/** Logical design resolution (UI letterbox reference). */
 export const LOGICAL_W = 960;
 export const LOGICAL_H = 540;
 
@@ -8,99 +8,68 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const COLORS = {
-  skyTop: '#7ec8e3',
-  skyBottom: '#c8e7f5',
-  grassDark: '#2d6a4f',
-  grassLight: '#40916c',
-  pitch: '#c4a574',
-  pitchLine: '#e9d5b0',
-  boundary: '#f4d35e',
-  stump: '#8b5a2b',
-  ball: '#d62828',
-  ballSeam: '#f8f9fa',
-  hud: '#f6fff8',
   accent: '#f4d35e',
   danger: '#e76f51',
-  batterBody: '#52b788',
-  batterBelly: '#95d5b2',
-  batterWing: '#74c69d',
-  bowlerShell: '#e9c46a',
-  bowlerBody: '#6d6875',
-  crowd: '#1b4332',
+  hud: '#f6fff8',
 } as const;
 
-/** World-space layout (logical pixels). */
-export const FIELD = {
-  groundY: 420,
-  pitchLeft: 280,
-  pitchRight: 780,
-  pitchTop: 360,
-  pitchBottom: 430,
-  batterX: 720,
-  batterY: 390,
-  bowlerX: 320,
-  bowlerY: 390,
-  stumpX: 760,
-  stumpY: 400,
-  boundaryX: 120,
-  /** Rough outfield left edge for 4/6 detection. */
-  sixClearHeight: 70,
+/** 3D cricket ground (Y-up, pitch along Z). */
+export const FIELD3D = {
+  pitchHalf: 10.5,
+  pitchWidth: 3.05,
+  stumpStrikerZ: 10.2,
+  stumpBowlerZ: -10.2,
+  strikerX: 0.35,
+  strikerZ: 9.4,
+  partnerX: -0.9,
+  partnerZ: -9.4,
+  bowlerX: 0,
+  bowlerStartZ: -16,
+  bowlerReleaseZ: -11.2,
+  boundaryR: 22,
+  sixClearY: 3.2,
+  groundY: 0,
 } as const;
 
 export const TIMING = {
-  /** Seconds: perfect contact half-width at base difficulty. */
   perfectWindow: 0.055,
   goodWindow: 0.11,
   edgeWindow: 0.16,
   swingDuration: 0.28,
-  resultHold: 1.15,
-  /** Longer holds so boundary celebrations and camera can land. */
-  resultHoldFour: 1.55,
-  resultHoldSix: 2.15,
-  outHold: 1.6,
-  betweenBalls: 0.55,
-} as const;
-
-/** Phase-driven broadcast camera (logical world space). */
-export const CAMERA = {
-  restZoom: 1,
-  bowlZoomStart: 1.1,
-  bowlZoomEnd: 1.2,
-  flightZoom: 1.24,
-  hitPunchZoom: 1.3,
-  hitFollowZoom: 1.08,
-  fourZoom: 0.94,
-  sixZoom: 0.86,
-  outZoom: 1.22,
-  /** Higher = snappier tracking. */
-  lerpPos: 9,
-  lerpZoom: 7,
-  hitLerpPos: 14,
-  hitLerpZoom: 11,
-  zoomMin: 0.82,
-  zoomMax: 1.35,
-  lookMinX: 80,
-  lookMaxX: 880,
-  lookMinY: 120,
-  lookMaxY: 460,
+  /** Quiet non-boundary contact — no run count, short beat only. */
+  deadBallHold: 0.55,
+  resultHoldFour: 1.7,
+  resultHoldSix: 2.4,
+  outHold: 1.7,
 } as const;
 
 export const PHYSICS = {
-  gravity: 980,
-  ballRadius: 8,
-  baseDeliverySpeed: 300,
-  maxDeliverySpeed: 520,
-  bounceRestitution: 0.55,
-  groundFriction: 0.82,
+  gravity: 18,
+  ballRadius: 0.1,
+  baseDeliverySpeed: 22,
+  maxDeliverySpeed: 36,
+  bounceRestitution: 0.45,
+  groundFriction: 0.88,
 } as const;
 
 export const DIFFICULTY = {
-  /** Score contribution to speed. */
-  speedPerScore: 0.4,
-  speedPerDelivery: 2.2,
-  /** Timing window shrinks toward this scale. */
+  speedPerScore: 0.12,
+  speedPerDelivery: 0.18,
   minWindowScale: 0.55,
-  windowScoreFactor: 700,
+  windowScoreFactor: 120,
   maxVariance: 0.38,
-  varianceScoreFactor: 450,
+  varianceScoreFactor: 90,
+} as const;
+
+/** Cinematic camera presets (world space). */
+export const CAM3D = {
+  rest: { pos: [9.5, 5.2, 16.5] as const, look: [0, 0.6, 0] as const },
+  bowl: { pos: [4.2, 3.2, -6] as const, look: [0, 1, -8] as const },
+  flight: { pos: [5.5, 3.4, 12] as const, look: [0.2, 1.1, 8] as const },
+  punch: { pos: [3.2, 2.6, 11.5] as const, look: [0.3, 1.2, 9] as const },
+  four: { pos: [8, 4.5, 6] as const, look: [-8, 0.8, 2] as const },
+  six: { pos: [14, 9, 10] as const, look: [-6, 4, -2] as const },
+  out: { pos: [3, 2.4, 12] as const, look: [0.3, 1, 10] as const },
+  lerp: 4.5,
+  hitLerp: 8,
 } as const;

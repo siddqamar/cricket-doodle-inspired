@@ -1,22 +1,28 @@
-import { LOGICAL_H, LOGICAL_W } from '../config/constants';
-import { Camera, fitCanvasToParent } from './camera';
+import * as THREE from 'three';
 import { Input } from './input';
-import { PlayScene } from '../scenes/play';
+import { PlayScene3D } from '../scenes/play3d';
+import { Camera3D } from '../world/camera3d';
 import { Overlay } from '../ui/overlay';
 import { audio } from '../audio/audio';
-import { drawTitleBackdrop } from '../assets/draw';
 import { loadHighScore } from '../utils/storage';
+import { buildStadium } from '../world/stadium';
+import { createBug } from '../world/bugs';
+import { CAM3D } from '../config/constants';
 
 type Mode = 'title' | 'instructions' | 'playing' | 'paused' | 'gameover';
 
+/**
+ * WebGL / Three.js game shell — 3D pitch, boundary-only scoring.
+ */
 export class Game {
-  private readonly canvas: HTMLCanvasElement;
-  private readonly ctx: CanvasRenderingContext2D;
   private readonly shell: HTMLElement;
-  private readonly camera = new Camera();
+  private readonly renderer: THREE.WebGLRenderer;
+  private readonly cam: Camera3D;
   private readonly input: Input;
   private readonly overlay: Overlay;
-  private play: PlayScene | null = null;
+
+  private play: PlayScene3D | null = null;
+  private titleScene: THREE.Scene | null = null;
   private mode: Mode = 'title';
   private running = false;
   private last = 0;
@@ -25,12 +31,28 @@ export class Game {
   private gameOverHigh = 0;
   private raf = 0;
 
+  private hudEl: HTMLDivElement | null = null;
+  private bannerEl: HTMLDivElement | null = null;
+
   constructor(canvas: HTMLCanvasElement, shell: HTMLElement, uiRoot: HTMLElement) {
-    this.canvas = canvas;
     this.shell = shell;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D not supported');
-    this.ctx = ctx;
+
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      powerPreference: 'high-performance',
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+
+    const rect = shell.getBoundingClientRect();
+    this.cam = new Camera3D(Math.max(0.1, rect.width / Math.max(1, rect.height)));
+    this.resize();
 
     this.input = new Input(canvas, () => this.mode === 'playing');
 
@@ -50,11 +72,53 @@ export class Game {
       onPause: () => this.pause(),
     });
 
+    this.ensureHud(shell);
+
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('keydown', (e) => this.onKey(e));
 
-    this.resize();
+    this.buildTitleScene();
     this.setMode('title');
+  }
+
+  private ensureHud(shell: HTMLElement): void {
+    this.hudEl = document.createElement('div');
+    this.hudEl.className = 'hud-3d';
+    this.hudEl.innerHTML = `
+      <div class="hud-score"><span data-score>0</span></div>
+      <div class="hud-meta">Best <span data-best>0</span> · Balls <span data-balls>0</span></div>
+      <div class="hud-note">Boundaries only · no run chase</div>
+    `;
+    shell.appendChild(this.hudEl);
+
+    this.bannerEl = document.createElement('div');
+    this.bannerEl.className = 'banner-3d hidden';
+    shell.appendChild(this.bannerEl);
+  }
+
+  private buildTitleScene(): void {
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xbfe9ff, 0x2d6a4f, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff2d6, 1.1);
+    sun.position.set(10, 18, 6);
+    sun.castShadow = true;
+    scene.add(sun);
+    scene.add(buildStadium());
+
+    const s = createBug('striker', 1.2);
+    s.position.set(0.4, 0, 6);
+    s.rotation.y = Math.PI + 0.4;
+    scene.add(s);
+    const p = createBug('partner', 1.1);
+    p.position.set(-1.2, 0, 5.2);
+    p.rotation.y = Math.PI - 0.3;
+    scene.add(p);
+    const b = createBug('bowler', 1.15);
+    b.position.set(0, 0, -4);
+    scene.add(b);
+
+    this.titleScene = scene;
+    this.cam.setPose({ pos: CAM3D.rest.pos, look: [0, 0.8, 2], snap: true });
   }
 
   start(): void {
@@ -75,17 +139,21 @@ export class Game {
     this.running = false;
     cancelAnimationFrame(this.raf);
     this.input.destroy();
+    this.renderer.dispose();
   }
 
   private resize(): void {
-    fitCanvasToParent(this.canvas, this.shell);
+    const rect = this.shell.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    this.renderer.setSize(w, h, false);
+    this.cam.setAspect(w / h);
   }
 
   private onKey(e: KeyboardEvent): void {
     if (e.code === 'KeyM') {
       void audio.ensure();
       audio.toggleMute();
-      // refresh overlay icons if visible
       if (this.mode === 'playing' || this.mode === 'paused') {
         this.overlay.setMode(this.mode === 'paused' ? 'paused' : 'hidden');
       }
@@ -100,11 +168,13 @@ export class Game {
 
   private setMode(mode: Mode): void {
     this.mode = mode;
+    if (this.hudEl) {
+      this.hudEl.classList.toggle('hidden', mode !== 'playing' && mode !== 'paused');
+    }
     if (mode === 'title') {
-      this.camera.reset(true);
+      this.cam.reset(true);
       this.overlay.setMode('title', 0, loadHighScore());
     } else if (mode === 'instructions') {
-      this.camera.reset(true);
       this.overlay.setMode('instructions');
     } else if (mode === 'playing') {
       this.overlay.setMode('hidden');
@@ -118,16 +188,42 @@ export class Game {
   private startGame(): void {
     void audio.ensure();
     audio.startAmbience();
-    this.camera.reset(true);
-    this.play = new PlayScene(this.camera, {
+    this.play?.dispose();
+    this.cam.reset(true);
+    this.play = new PlayScene3D(this.cam, {
       onGameOver: (score, high) => {
         this.gameOverScore = score;
         this.gameOverHigh = high;
-        this.camera.reset(false);
         this.setMode('gameover');
       },
+      onHud: (score, high, balls, banner) => this.updateHud(score, high, balls, banner),
     });
     this.setMode('playing');
+  }
+
+  private updateHud(
+    score: number,
+    high: number,
+    balls: number,
+    banner: string | null,
+  ): void {
+    if (!this.hudEl || !this.bannerEl) return;
+    const s = this.hudEl.querySelector('[data-score]');
+    const b = this.hudEl.querySelector('[data-best]');
+    const d = this.hudEl.querySelector('[data-balls]');
+    if (s) s.textContent = String(score);
+    if (b) b.textContent = String(high);
+    if (d) d.textContent = String(balls);
+
+    if (banner) {
+      this.bannerEl.textContent = banner;
+      this.bannerEl.classList.remove('hidden');
+      this.bannerEl.classList.toggle('six', banner === 'SIX!');
+      this.bannerEl.classList.toggle('four', banner === 'FOUR!');
+      this.bannerEl.classList.toggle('out', banner === 'BOWLED!' || banner === 'CAUGHT!');
+    } else {
+      this.bannerEl.classList.add('hidden');
+    }
   }
 
   private pause(): void {
@@ -143,41 +239,30 @@ export class Game {
   private tick(dt: number): void {
     this.time += dt;
     this.input.beginFrame();
-    this.camera.update(dt);
 
     if (this.mode === 'playing' && this.play) {
       this.play.update(dt, this.input.swingPressed);
+    } else if (this.mode === 'title' || this.mode === 'instructions') {
+      // Slow orbit on title
+      const a = this.time * 0.15;
+      this.cam.setPose({
+        pos: [Math.cos(a) * 12, 5.5, Math.sin(a) * 12 + 4],
+        look: [0, 0.8, 2],
+        lerp: 2,
+      });
     }
 
+    this.cam.update(dt);
     this.render();
   }
 
   private render(): void {
-    const ctx = this.ctx;
-    ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
-
-    if (this.mode === 'title' || this.mode === 'instructions') {
-      ctx.save();
-      drawTitleBackdrop(ctx, this.time);
-      // Dim for UI readability
-      ctx.fillStyle = 'rgba(8, 32, 21, 0.28)';
-      ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
-      ctx.restore();
-    } else if (this.play) {
-      // World (zoom / pan / shake)
-      ctx.save();
-      this.camera.apply(ctx);
-      this.play.drawWorld(ctx);
-      ctx.restore();
-
-      // HUD stays screen-fixed so scoreboard and banners stay readable
-      ctx.save();
-      this.play.drawHud(ctx);
-      if (this.mode === 'paused' || this.mode === 'gameover') {
-        ctx.fillStyle = 'rgba(8, 32, 21, 0.4)';
-        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+    if (this.mode === 'playing' || this.mode === 'paused' || this.mode === 'gameover') {
+      if (this.play) {
+        this.renderer.render(this.play.scene, this.cam.camera);
       }
-      ctx.restore();
+    } else if (this.titleScene) {
+      this.renderer.render(this.titleScene, this.cam.camera);
     }
   }
 }

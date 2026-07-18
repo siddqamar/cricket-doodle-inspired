@@ -3,14 +3,18 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Pitch Bugs — a cute insect cricket arcade game for the browser (Canvas, TypeScript, Vite).",
+  "description": "Pitch Bugs — a 3D insect cricket arcade game for the browser (Three.js, TypeScript, Vite).",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/three": "^0.185.1",
     "typescript": "^5.7.3",
     "vite": "^6.0.7"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
   }
 }

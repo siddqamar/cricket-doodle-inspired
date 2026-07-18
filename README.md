@@ -1,8 +1,10 @@
 # Pitch Bugs
 
-A cute insect cricket arcade game for the browser. Time your swing, send the ball to the boundary, and chase a high score before the fielding beetles take your wicket.
+A **3D** insect cricket arcade game for the browser. Time your swing, smash **fours and sixes**, and chase a high score before the fielding beetles take your wicket.
 
-Built with original art, audio, and code — HTML5 Canvas, TypeScript, and Vite. Static site, no backend.
+**Boundaries only** — no run chase, no 1s/2s count. Two batting bugs stand at the creases (they don’t run between wickets). Celebrations fire only on 4 or 6.
+
+Built with original art, audio, and code — **Three.js**, TypeScript, and Vite. Static site, no backend.
 
 ## Play locally
 
@@ -33,30 +35,30 @@ Deploy `dist/` with GitHub Pages (branch or Actions). No backend required.
 
 ## Features
 
-- Title screen, instructions, pause, restart
-- Timing-based shots: miss, edge, 1, 2, 4, 6
+- 3D stadium, pitch, crowd, and cinematic camera
+- Stylized insect characters (striker, partner, bowler, fielders)
+- Two batting-side players at the creases (no run animation / no run count)
+- Score **only** on fours & sixes; celebratory banners + confetti on boundaries
 - Bowled & caught dismissals
 - Difficulty ramp (pace + tighter windows)
 - High score via `localStorage`
-- Procedural canvas art & Web Audio SFX
-- Responsive letterboxed canvas (desktop / tablet / mobile)
-- Respects `prefers-reduced-motion` for shake/particles
+- Procedural Web Audio SFX
+- Responsive letterboxed WebGL view
+- Respects `prefers-reduced-motion` for camera/particles
 
 ## Project layout
 
 ```
-docs/RESEARCH.md           Phase 1 design research notes
-docs/TECHNICAL_DESIGN.md   Phase 2 technical design
-src/engine/                Game loop, input, camera
-src/entities/              VFX helpers
-src/scenes/                Play scene / match logic
-src/assets/                Procedural drawing
+docs/                      Design notes
+src/engine/                Game loop, input, WebGL shell
+src/scenes/                3D play / match logic
+src/world/                 Stadium, bugs, camera, FX
 src/audio/                 Procedural sound
-src/ui/                    DOM overlays
+src/ui/                    DOM overlays + match HUD
 src/config/                Constants
 src/utils/                 Math, storage
 ```
 
 ## License
 
-See `LICENSE` in this repository.
+See [LICENSE](./LICENSE).

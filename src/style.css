@@ -214,6 +214,80 @@ button.btn.ghost {
   display: none !important;
 }
 
+/* —— 3D match HUD (screen-fixed) —— */
+.hud-3d {
+  position: absolute;
+  top: 2.5%;
+  left: 3%;
+  z-index: 2;
+  pointer-events: none;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+.hud-3d .hud-score {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.hud-3d .hud-meta {
+  margin-top: 0.25rem;
+  font-size: clamp(0.75rem, 2vw, 0.9rem);
+  color: rgba(246, 255, 248, 0.88);
+}
+
+.hud-3d .hud-note {
+  margin-top: 0.2rem;
+  font-size: clamp(0.65rem, 1.6vw, 0.78rem);
+  color: rgba(183, 212, 194, 0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.banner-3d {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  pointer-events: none;
+  font-size: clamp(2.4rem, 8vw, 4rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-shadow:
+    0 0 24px rgba(244, 211, 94, 0.55),
+    0 4px 0 rgba(0, 0, 0, 0.35);
+  animation: banner-pop 0.35s ease-out;
+}
+
+.banner-3d.four {
+  color: #fff;
+  text-shadow:
+    0 0 20px rgba(255, 255, 255, 0.45),
+    0 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.banner-3d.out {
+  color: var(--danger);
+  text-shadow:
+    0 0 18px rgba(231, 111, 81, 0.5),
+    0 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+@keyframes banner-pop {
+  from {
+    transform: translateX(-50%) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   button.btn {
     transition: none;
