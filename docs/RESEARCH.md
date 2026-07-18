@@ -148,11 +148,11 @@ Style target: springy, readable insect silhouettes with elastic timing juice.
 
 ## 9. Camera Behavior
 
-- Mostly **fixed stage view** of pitch + batter end.
+- Phase-driven **broadcast camera**: zoom in on bowling/flight, open out on big hits.
 - Subtle **screen shake** on hard hits / wicket.
-- Optional light pan toward ball flight on sixes.
+- Pan + zoom-out on fours/sixes; HUD stays screen-fixed.
 
-**Implementation:** Fixed virtual camera in world space; canvas letterboxes; mild shake offset.
+**Implementation:** Virtual camera (look + zoom + shake) in world space; canvas letterboxes; world/HUD draw split.
 
 ---
 

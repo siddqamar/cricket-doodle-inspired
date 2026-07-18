@@ -9,6 +9,7 @@ export type FloatText = {
   life: number;
   maxLife: number;
   vy: number;
+  size: number;
 };
 
 export type Particle = {
@@ -20,14 +21,25 @@ export type Particle = {
   maxLife: number;
   color: string;
   size: number;
+  gravity: number;
 };
+
+const CONFETTI_COLORS = [
+  '#f4d35e',
+  '#fff',
+  '#e76f51',
+  '#52b788',
+  '#7ec8e3',
+  '#ff85a1',
+  '#ffd166',
+];
 
 export class VfxSystem {
   floats: FloatText[] = [];
   particles: Particle[] = [];
   private readonly maxParticles: number;
 
-  constructor(maxParticles = 80) {
+  constructor(maxParticles = 140) {
     this.maxParticles = maxParticles;
   }
 
@@ -36,33 +48,75 @@ export class VfxSystem {
     this.particles.length = 0;
   }
 
-  float(x: number, y: number, text: string, color: string = COLORS.accent): void {
+  float(
+    x: number,
+    y: number,
+    text: string,
+    color: string = COLORS.accent,
+    opts?: { life?: number; size?: number; vy?: number },
+  ): void {
+    const life = opts?.life ?? 1.1;
     this.floats.push({
       x,
       y,
       text,
       color,
-      life: 1.1,
-      maxLife: 1.1,
-      vy: -40,
+      life,
+      maxLife: life,
+      vy: opts?.vy ?? -40,
+      size: opts?.size ?? 28,
     });
   }
 
-  burst(x: number, y: number, color: string, n = 12, reduced = false): void {
+  burst(
+    x: number,
+    y: number,
+    color: string,
+    n = 12,
+    reduced = false,
+    opts?: { speedMin?: number; speedMax?: number; life?: number },
+  ): void {
     const count = reduced ? Math.ceil(n * 0.35) : n;
+    const speedMin = opts?.speedMin ?? 60;
+    const speedMax = opts?.speedMax ?? 220;
+    const maxLife = opts?.life ?? 0.8;
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= this.maxParticles) this.particles.shift();
       const a = randRange(0, Math.PI * 2);
-      const sp = randRange(60, 220);
+      const sp = randRange(speedMin, speedMax);
       this.particles.push({
         x,
         y,
         vx: Math.cos(a) * sp,
         vy: Math.sin(a) * sp - 80,
-        life: randRange(0.35, 0.8),
-        maxLife: 0.8,
+        life: randRange(maxLife * 0.45, maxLife),
+        maxLife,
         color,
         size: randRange(2, 5),
+        gravity: 400,
+      });
+    }
+  }
+
+  /** Multicolor confetti for sixes / big boundaries. */
+  confetti(x: number, y: number, n = 36, reduced = false): void {
+    const count = reduced ? Math.ceil(n * 0.3) : n;
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= this.maxParticles) this.particles.shift();
+      const a = randRange(-Math.PI * 0.95, -Math.PI * 0.05);
+      const sp = randRange(90, 320);
+      const color =
+        CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)]!;
+      this.particles.push({
+        x: x + randRange(-18, 18),
+        y: y + randRange(-10, 10),
+        vx: Math.cos(a) * sp + randRange(-40, 40),
+        vy: Math.sin(a) * sp,
+        life: randRange(0.7, 1.35),
+        maxLife: 1.35,
+        color,
+        size: randRange(2.5, 6.5),
+        gravity: 520,
       });
     }
   }
@@ -79,7 +133,7 @@ export class VfxSystem {
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vy += 400 * dt;
+      p.vy += p.gravity * dt;
       if (p.life <= 0) this.particles.splice(i, 1);
     }
   }
@@ -95,10 +149,10 @@ export class VfxSystem {
     }
     ctx.globalAlpha = 1;
     ctx.textAlign = 'center';
-    ctx.font = 'bold 28px Segoe UI, system-ui, sans-serif';
     for (const f of this.floats) {
       const a = clamp(f.life / f.maxLife, 0, 1);
       ctx.globalAlpha = a;
+      ctx.font = `bold ${f.size}px Segoe UI, system-ui, sans-serif`;
       ctx.fillStyle = f.color;
       ctx.strokeStyle = 'rgba(0,0,0,0.35)';
       ctx.lineWidth = 4;

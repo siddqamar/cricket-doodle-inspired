@@ -95,6 +95,31 @@ export class AudioEngine {
     });
   }
 
+  /** Longer crowd swell for sixes. */
+  cheerBig(): void {
+    void this.ensure().then(() => {
+      if (!this.ctx || !this.out()) return;
+      this.noiseBurst(0.55, 0.28, 850, true);
+      this.noiseBurst(0.7, 0.14, 1400, true);
+      const t = this.now();
+      for (let i = 0; i < 8; i++) {
+        const osc = this.ctx!.createOscillator();
+        const g = this.ctx!.createGain();
+        osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+        const f = 320 + Math.random() * 680;
+        const start = t + i * 0.04;
+        osc.frequency.setValueAtTime(f, start);
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.exponentialRampToValueAtTime(0.1, start + 0.025);
+        g.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+        osc.connect(g);
+        g.connect(this.out()!);
+        osc.start(start);
+        osc.stop(start + 0.38);
+      }
+    });
+  }
+
   wicket(): void {
     void this.ensure().then(() => {
       if (!this.ctx || !this.out()) return;

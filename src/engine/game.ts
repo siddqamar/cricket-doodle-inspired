@@ -101,8 +101,10 @@ export class Game {
   private setMode(mode: Mode): void {
     this.mode = mode;
     if (mode === 'title') {
+      this.camera.reset(true);
       this.overlay.setMode('title', 0, loadHighScore());
     } else if (mode === 'instructions') {
+      this.camera.reset(true);
       this.overlay.setMode('instructions');
     } else if (mode === 'playing') {
       this.overlay.setMode('hidden');
@@ -116,10 +118,12 @@ export class Game {
   private startGame(): void {
     void audio.ensure();
     audio.startAmbience();
+    this.camera.reset(true);
     this.play = new PlayScene(this.camera, {
       onGameOver: (score, high) => {
         this.gameOverScore = score;
         this.gameOverHigh = high;
+        this.camera.reset(false);
         this.setMode('gameover');
       },
     });
@@ -150,23 +154,30 @@ export class Game {
 
   private render(): void {
     const ctx = this.ctx;
-    ctx.save();
     ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
-    this.camera.apply(ctx);
 
     if (this.mode === 'title' || this.mode === 'instructions') {
+      ctx.save();
       drawTitleBackdrop(ctx, this.time);
       // Dim for UI readability
       ctx.fillStyle = 'rgba(8, 32, 21, 0.28)';
       ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+      ctx.restore();
     } else if (this.play) {
-      this.play.draw(ctx);
+      // World (zoom / pan / shake)
+      ctx.save();
+      this.camera.apply(ctx);
+      this.play.drawWorld(ctx);
+      ctx.restore();
+
+      // HUD stays screen-fixed so scoreboard and banners stay readable
+      ctx.save();
+      this.play.drawHud(ctx);
       if (this.mode === 'paused' || this.mode === 'gameover') {
         ctx.fillStyle = 'rgba(8, 32, 21, 0.4)';
         ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
       }
+      ctx.restore();
     }
-
-    ctx.restore();
   }
 }

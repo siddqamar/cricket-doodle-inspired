@@ -54,8 +54,35 @@ export const TIMING = {
   edgeWindow: 0.16,
   swingDuration: 0.28,
   resultHold: 1.15,
+  /** Longer holds so boundary celebrations and camera can land. */
+  resultHoldFour: 1.55,
+  resultHoldSix: 2.15,
   outHold: 1.6,
   betweenBalls: 0.55,
+} as const;
+
+/** Phase-driven broadcast camera (logical world space). */
+export const CAMERA = {
+  restZoom: 1,
+  bowlZoomStart: 1.1,
+  bowlZoomEnd: 1.2,
+  flightZoom: 1.24,
+  hitPunchZoom: 1.3,
+  hitFollowZoom: 1.08,
+  fourZoom: 0.94,
+  sixZoom: 0.86,
+  outZoom: 1.22,
+  /** Higher = snappier tracking. */
+  lerpPos: 9,
+  lerpZoom: 7,
+  hitLerpPos: 14,
+  hitLerpZoom: 11,
+  zoomMin: 0.82,
+  zoomMax: 1.35,
+  lookMinX: 80,
+  lookMaxX: 880,
+  lookMinY: 120,
+  lookMaxY: 460,
 } as const;
 
 export const PHYSICS = {
