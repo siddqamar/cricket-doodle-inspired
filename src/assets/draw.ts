@@ -138,12 +138,17 @@ export function drawBatter(
   pose: BatterPose,
 ): void {
   ctx.save();
-  ctx.translate(x, y);
+  // Celebrate: small hop + body lift
+  const hop =
+    pose.celebrate > 0
+      ? Math.abs(Math.sin(pose.celebrate * 10)) * 6 * Math.min(1, pose.celebrate)
+      : 0;
+  ctx.translate(x, y - hop);
 
-  // Shadow
+  // Shadow (stays grounded)
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath();
-  ctx.ellipse(0, 18, 22, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 18 + hop, 22 - hop * 0.4, 7, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const swing = pose.swingT > 0 ? easeOutCubic(Math.min(1, pose.swingT)) : 0;
@@ -153,7 +158,8 @@ export function drawBatter(
     batAngle = -0.9 + swing * 2.4;
   }
   if (pose.celebrate > 0) {
-    batAngle = -1.2 + Math.sin(pose.celebrate * 8) * 0.2;
+    // Arms up victory flourish
+    batAngle = -1.45 + Math.sin(pose.celebrate * 9) * 0.28;
   }
 
   // Legs
@@ -162,9 +168,9 @@ export function drawBatter(
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(-6, 8);
-  ctx.lineTo(-10, 18);
+  ctx.lineTo(-10, 18 + hop * 0.15);
   ctx.moveTo(6, 8);
-  ctx.lineTo(10, 18);
+  ctx.lineTo(10, 18 + hop * 0.15);
   ctx.stroke();
 
   // Body
@@ -177,12 +183,13 @@ export function drawBatter(
   ctx.ellipse(2, 0, 9, 11, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Wings
+  // Wings (flutter more while celebrating)
+  const wingFlap = pose.celebrate > 0 ? Math.sin(pose.celebrate * 14) * 0.25 : 0;
   ctx.fillStyle = COLORS.batterWing;
   ctx.globalAlpha = 0.85;
   ctx.beginPath();
-  ctx.ellipse(-14, -8, 10, 6, -0.5, 0, Math.PI * 2);
-  ctx.ellipse(14, -10, 10, 6, 0.5, 0, Math.PI * 2);
+  ctx.ellipse(-14, -8, 10, 6, -0.5 - wingFlap, 0, Math.PI * 2);
+  ctx.ellipse(14, -10, 10, 6, 0.5 + wingFlap, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
 
