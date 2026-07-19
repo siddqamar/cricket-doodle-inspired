@@ -23,7 +23,18 @@ npm run build
 
 Static output is written to `dist/`. The Vite config uses `base: './'` so relative asset paths work on project pages.
 
-Deploy `dist/` with GitHub Pages (branch or Actions). No backend required.
+### Deploy with GitHub Actions (recommended)
+
+This repo includes [`.github/workflows/pages.yml`](./.github/workflows/pages.yml). On every push to `main` it runs `npm ci`, `npm run build`, and publishes **`dist/`** (not the source tree).
+
+**One-time repo setting (required):**
+
+1. Open the GitHub repo → **Settings** → **Pages**
+2. Under **Build and deployment** → **Source**, choose **GitHub Actions** (not “Deploy from a branch”)
+
+If Source is left on “Deploy from a branch”, GitHub serves raw `index.html` + `/src/*.ts` and the game appears blank.
+
+No backend required. Do not commit `dist/` — CI builds it.
 
 ## Controls
 
