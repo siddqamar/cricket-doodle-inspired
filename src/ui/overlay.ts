@@ -110,7 +110,8 @@ export class Overlay {
           <li>Watch the bounce — time the ball under your bat.</li>
           <li><strong>Only boundaries score</strong> — fours &amp; sixes. No run chase, no 1s/2s count.</li>
           <li>Two batting bugs stand ready; they don&rsquo;t run between wickets.</li>
-          <li>Miss = bowled. Loft to a fielder = caught. Celebrate only on 4 or 6!</li>
+          <li>Miss = bowled. Hit to a fielder <strong>in the air</strong> (no bounce) = caught.</li>
+          <li>Boundary on the full = six; bounce then over the rope = four. Celebrate only on 4 or 6!</li>
         </ul>
       `;
       const row = document.createElement('div');

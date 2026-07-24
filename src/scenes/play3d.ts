@@ -77,6 +77,8 @@ export class PlayScene3D {
   private ballPos = new THREE.Vector3();
   private ballVel = new THREE.Vector3();
   private ballActive = false;
+  /** True once the ball has touched the ground after bat contact (kills catch & six). */
+  private hasBouncedSinceHit = false;
 
   private delivery: {
     speed: number;
@@ -324,6 +326,7 @@ export class PlayScene3D {
 
     this.ballActive = true;
     this.ball.visible = true;
+    this.hasBouncedSinceHit = false;
     this.phase = 'hit_flight';
     this.phaseT = 0;
     audio.batHit(quality === 'perfect' ? 1 : quality === 'good' ? 0.8 : 0.45);
@@ -514,9 +517,10 @@ export class PlayScene3D {
     this.ballVel.y -= PHYSICS.gravity * dt;
     this.ballPos.addScaledVector(this.ballVel, dt);
 
-    // Ground bounce
+    // Ground bounce — first contact after the hit sets bounce state for catch/boundary rules
     if (this.ballPos.y < 0.12) {
       this.ballPos.y = 0.12;
+      this.hasBouncedSinceHit = true;
       if (Math.abs(this.ballVel.y) > 1.5) {
         this.ballVel.y *= -PHYSICS.bounceRestitution;
         this.ballVel.x *= PHYSICS.groundFriction;
@@ -528,8 +532,13 @@ export class PlayScene3D {
       }
     }
 
-    // Catches
-    if (this.ballPos.y > 0.6 && this.ballPos.y < 3.2 && this.ballVel.y < 2) {
+    // Catches — only on the full; a bounce makes the ball safe (not out)
+    if (
+      !this.hasBouncedSinceHit &&
+      this.ballPos.y > 0.6 &&
+      this.ballPos.y < 3.2 &&
+      this.ballVel.y < 2
+    ) {
       for (const f of this.fielders) {
         const d = Math.hypot(
           this.ballPos.x - f.position.x,
@@ -547,14 +556,14 @@ export class PlayScene3D {
     const lofted = this.ballPos.y > 2.2 || this.ballVel.y > 6;
     this.cam.follow(this.ballPos, lofted ? 0.75 : 0.25, lofted ? 7 : 4);
 
-    // Boundary
+    // Boundary — six only on the full; bounce before the rope is always four
     const r = Math.hypot(this.ballPos.x, this.ballPos.z);
     if (r >= FIELD3D.boundaryR) {
-      if (this.ballPos.y > FIELD3D.sixClearY * 0.55 || (lofted && this.ballPos.y > 1.5)) {
-        this.finishBoundary('six');
-      } else {
-        this.finishBoundary('four');
-      }
+      const clearsOnFull =
+        !this.hasBouncedSinceHit &&
+        (this.ballPos.y > FIELD3D.sixClearY * 0.55 ||
+          (lofted && this.ballPos.y > 1.5));
+      this.finishBoundary(clearsOnFull ? 'six' : 'four');
       return;
     }
 
