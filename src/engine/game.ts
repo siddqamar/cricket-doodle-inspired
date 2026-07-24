@@ -12,7 +12,7 @@ import { CAM3D } from '../config/constants';
 type Mode = 'title' | 'instructions' | 'playing' | 'paused' | 'gameover';
 
 /**
- * WebGL / Three.js game shell — 3D pitch, boundary-only scoring.
+ * WebGL / Three.js game shell — 3D pitch, running + boundaries.
  */
 export class Game {
   private readonly shell: HTMLElement;
@@ -87,7 +87,7 @@ export class Game {
     this.hudEl.innerHTML = `
       <div class="hud-score"><span data-score>0</span></div>
       <div class="hud-meta">Best <span data-best>0</span> · Balls <span data-balls>0</span></div>
-      <div class="hud-note">Boundaries only · no run chase</div>
+      <div class="hud-note">Run the gaps · fielders chase</div>
     `;
     shell.appendChild(this.hudEl);
 

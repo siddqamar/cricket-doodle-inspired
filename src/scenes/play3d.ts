@@ -406,6 +406,7 @@ export class PlayScene3D {
       look: CAM3D.bowl.look,
       lerp: CAM3D.lerp,
     });
+    this.cam.setFov(CAM3D.defaultFov);
     this.pushHud();
   }
 
@@ -760,15 +761,13 @@ export class PlayScene3D {
 
     // Camera: zoom in for running corridor, out for deep loft / boundary threat
     if (this.running && !lofted && !deep) {
-      this.cam.setPose({
-        pos: CAM3D.running.pos,
-        look: [
+      this.cam.frameRunning(
+        this._tmp.set(
           (this.striker.position.x + this.partner.position.x) * 0.5,
           0.9,
           (this.striker.position.z + this.partner.position.z) * 0.5,
-        ],
-        lerp: CAM3D.hitLerp,
-      });
+        ),
+      );
     } else {
       this.cam.follow(this.ballPos, lofted || deep ? 0.75 : 0.25, lofted ? 7 : 4);
     }
@@ -952,6 +951,7 @@ export class PlayScene3D {
       this.ballActive = false;
       this.banner = null;
       this.cam.setPose({ pos: CAM3D.rest.pos, look: CAM3D.rest.look, lerp: CAM3D.lerp });
+      this.cam.setFov(CAM3D.defaultFov);
       return;
     }
 
@@ -964,11 +964,7 @@ export class PlayScene3D {
     this.banner = n === 1 ? '1' : n === 2 ? '2' : '3';
     this.celebrate = n >= 2 ? 0.7 : 0.35;
     audio.cheer(n >= 2 ? 0.55 : 0.35);
-    this.cam.setPose({
-      pos: CAM3D.running.pos,
-      look: [0, 0.9, 0],
-      lerp: CAM3D.lerp,
-    });
+    this.cam.frameRunning(this._tmp.set(0, 0.9, 0));
     this.fx.burst(
       new THREE.Vector3(0, 1, (this.striker.position.z + this.partner.position.z) * 0.5),
       0xf4d35e,
@@ -1050,11 +1046,7 @@ export class PlayScene3D {
       this.lastShot === 'two' ||
       this.lastShot === 'three'
     ) {
-      this.cam.setPose({
-        pos: CAM3D.running.pos,
-        look: [0, 0.9, 0],
-        lerp: 3.5,
-      });
+      this.cam.frameRunning(this._tmp.set(0, 0.9, 0));
     }
   }
 

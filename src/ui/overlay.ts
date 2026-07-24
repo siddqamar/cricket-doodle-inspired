@@ -108,10 +108,10 @@ export class Overlay {
         <ul class="instructions">
           <li><strong>Click, tap, or press Space</strong> to swing.</li>
           <li>Watch the bounce — time the ball under your bat.</li>
-          <li><strong>Only boundaries score</strong> — fours &amp; sixes. No run chase, no 1s/2s count.</li>
-          <li>Two batting bugs stand ready; they don&rsquo;t run between wickets.</li>
-          <li>Miss = bowled. Hit to a fielder <strong>in the air</strong> (no bounce) = caught.</li>
-          <li>Boundary on the full = six; bounce then over the rope = four. Celebrate only on 4 or 6!</li>
+          <li><strong>Great timing</strong> = boundaries; soft placement = batters run hard for 1s and 2s (3 is rare).</li>
+          <li>Fielders <strong>chase and cut off</strong> runs — gaps matter. Catches only on the full.</li>
+          <li>Boundary on the full = six; bounce then over the rope = four.</li>
+          <li>Early overs stay friendlier; pace and fielding heat up as the innings goes on.</li>
         </ul>
       `;
       const row = document.createElement('div');
@@ -130,7 +130,7 @@ export class Overlay {
     panel.className = 'panel';
     panel.innerHTML = `
       <h1>Pitch Bugs</h1>
-      <p class="tagline">3D insect cricket. Smash boundaries. No boring singles.</p>
+      <p class="tagline">3D insect cricket. Smash boundaries, run the gaps, watch fielders scramble.</p>
       <p class="meta">Best: ${this.lastHigh}</p>
     `;
     const row = document.createElement('div');
