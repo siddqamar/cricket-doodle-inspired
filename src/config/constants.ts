@@ -78,9 +78,9 @@ export const DIFFICULTY = {
 /** Running between wickets (auto-run resolution; animation sells it). */
 export const RUNNING = {
   /** Seconds to complete one end-to-end run at base pace. */
-  runDuration: 1.12,
+  runDuration: 1.85,
   /** Slightly slower turn for the second/third run. */
-  turnExtra: 0.12,
+  turnExtra: 0.22,
   maxRuns: 3,
   /**
    * Horizontal speed of the ball (approx) needed before batters attempt a run.
