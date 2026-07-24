@@ -556,14 +556,14 @@ export class PlayScene3D {
     const lofted = this.ballPos.y > 2.2 || this.ballVel.y > 6;
     this.cam.follow(this.ballPos, lofted ? 0.75 : 0.25, lofted ? 7 : 4);
 
-    // Boundary
+    // Boundary — six only on the full; bounce before the rope is always four
     const r = Math.hypot(this.ballPos.x, this.ballPos.z);
     if (r >= FIELD3D.boundaryR) {
-      if (this.ballPos.y > FIELD3D.sixClearY * 0.55 || (lofted && this.ballPos.y > 1.5)) {
-        this.finishBoundary('six');
-      } else {
-        this.finishBoundary('four');
-      }
+      const clearsOnFull =
+        !this.hasBouncedSinceHit &&
+        (this.ballPos.y > FIELD3D.sixClearY * 0.55 ||
+          (lofted && this.ballPos.y > 1.5));
+      this.finishBoundary(clearsOnFull ? 'six' : 'four');
       return;
     }
 
