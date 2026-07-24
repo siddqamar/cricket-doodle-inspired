@@ -77,6 +77,8 @@ export class PlayScene3D {
   private ballPos = new THREE.Vector3();
   private ballVel = new THREE.Vector3();
   private ballActive = false;
+  /** True once the ball has touched the ground after bat contact (kills catch & six). */
+  private hasBouncedSinceHit = false;
 
   private delivery: {
     speed: number;
@@ -324,6 +326,7 @@ export class PlayScene3D {
 
     this.ballActive = true;
     this.ball.visible = true;
+    this.hasBouncedSinceHit = false;
     this.phase = 'hit_flight';
     this.phaseT = 0;
     audio.batHit(quality === 'perfect' ? 1 : quality === 'good' ? 0.8 : 0.45);
@@ -514,9 +517,10 @@ export class PlayScene3D {
     this.ballVel.y -= PHYSICS.gravity * dt;
     this.ballPos.addScaledVector(this.ballVel, dt);
 
-    // Ground bounce
+    // Ground bounce — first contact after the hit sets bounce state for catch/boundary rules
     if (this.ballPos.y < 0.12) {
       this.ballPos.y = 0.12;
+      this.hasBouncedSinceHit = true;
       if (Math.abs(this.ballVel.y) > 1.5) {
         this.ballVel.y *= -PHYSICS.bounceRestitution;
         this.ballVel.x *= PHYSICS.groundFriction;
