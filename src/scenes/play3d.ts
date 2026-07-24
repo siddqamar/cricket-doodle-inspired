@@ -532,8 +532,13 @@ export class PlayScene3D {
       }
     }
 
-    // Catches
-    if (this.ballPos.y > 0.6 && this.ballPos.y < 3.2 && this.ballVel.y < 2) {
+    // Catches — only on the full; a bounce makes the ball safe (not out)
+    if (
+      !this.hasBouncedSinceHit &&
+      this.ballPos.y > 0.6 &&
+      this.ballPos.y < 3.2 &&
+      this.ballVel.y < 2
+    ) {
       for (const f of this.fielders) {
         const d = Math.hypot(
           this.ballPos.x - f.position.x,
