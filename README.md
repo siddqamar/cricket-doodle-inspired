@@ -2,9 +2,16 @@
 
 # Pitch Bugs
 
+[![Grok Build](https://img.shields.io/badge/Grok_Build-000000?style=for-the-badge&logo=x&logoColor=white)](https://grok.x.ai/)
+[![vibe coding](https://img.shields.io/badge/vibe_coding-7C3AED?style=for-the-badge)](#)
+[![Three.js](https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=threedotjs&logoColor=white)](https://threejs.org/)
+[![Browser game](https://img.shields.io/badge/browser_game-0EA5E9?style=for-the-badge)](#)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+
 **3D insect cricket for the browser** — time your swing, run the gaps, and chase a high score before the fielding beetles take your wicket.
 
-`Grok Build` · `vibe coding` · `Three.js` · `browser game` · `TypeScript` · `Vite`
+![Pitch Bugs gameplay](./animation.gif)
 
 [Play on GitHub Pages](https://siddqamar.github.io/cricket-doodle-inspired/)
 
