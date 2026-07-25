@@ -1,10 +1,45 @@
+<div align="center">
+
 # Pitch Bugs
 
-A **3D** insect cricket arcade game for the browser. Time your swing, smash **fours and sixes**, and chase a high score before the fielding beetles take your wicket.
+[![Grok Build](https://img.shields.io/badge/Grok_Build-000000?style=for-the-badge&logo=x&logoColor=white)](https://grok.x.ai/)
+[![vibe coding](https://img.shields.io/badge/vibe_coding-7C3AED?style=for-the-badge)](#)
+[![Three.js](https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=threedotjs&logoColor=white)](https://threejs.org/)
+[![Browser game](https://img.shields.io/badge/browser_game-0EA5E9?style=for-the-badge)](#)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 
-**Boundaries only** — no run chase, no 1s/2s count. Two batting bugs stand at the creases (they don’t run between wickets). Celebrations fire only on 4 or 6.
+**3D insect cricket for the browser** — time your swing, run the gaps, and chase a high score before the fielding beetles take your wicket.
 
-Built with original art, audio, and code — **Three.js**, TypeScript, and Vite. Static site, no backend.
+![Pitch Bugs gameplay](./animation.gif)
+
+[Play on GitHub Pages](https://siddqamar.github.io/cricket-doodle-inspired/)
+
+</div>
+
+---
+
+## What’s the game?
+
+You’re a little bug with a bat. One button. Big vibes.
+
+- **Time the bounce** — click, tap, or hit Space / Enter to swing  
+- **Smash boundaries** — six on the full, four after the bounce  
+- **Run the gaps** — soft shots turn into 1s and 2s (a rare 3 if the fielders nap)  
+- **Watch the scramble** — fielders chase, cut off runs, and only catch on the full  
+- **Survive the innings** — early overs are friendlier; pace and fielding heat up later  
+
+Two batting bugs at the creases, a whole stadium of insects, and a camera that leans into the big moments. No accounts, no backend — just you vs the beetles.
+
+Built as a **vibe-coded** project with [Grok Build](https://grok.x.ai/) — original art, procedural audio, and a tiny static site you can host anywhere.
+
+## Controls
+
+| Action | Input |
+|--------|--------|
+| Swing | Click, tap, Space, or Enter |
+| Pause | P or Esc |
+| Mute | M |
 
 ## Play locally
 
@@ -15,60 +50,13 @@ npm run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
-## Build (GitHub Pages)
+## Build
 
 ```bash
 npm run build
 ```
 
-Static output is written to `dist/`. The Vite config uses `base: './'` so relative asset paths work on project pages.
-
-### Deploy with GitHub Actions (recommended)
-
-This repo includes [`.github/workflows/pages.yml`](./.github/workflows/pages.yml). On every push to `main` it runs `npm ci`, `npm run build`, and publishes **`dist/`** (not the source tree).
-
-**One-time repo setting (required):**
-
-1. Open the GitHub repo → **Settings** → **Pages**
-2. Under **Build and deployment** → **Source**, choose **GitHub Actions** (not “Deploy from a branch”)
-
-If Source is left on “Deploy from a branch”, GitHub serves raw `index.html` + `/src/*.ts` and the game appears blank.
-
-No backend required. Do not commit `dist/` — CI builds it.
-
-## Controls
-
-| Action | Input |
-|--------|--------|
-| Swing | Click, tap, Space, or Enter |
-| Pause | P or Esc (also on-screen button) |
-| Mute | M (also on-screen button) |
-
-## Features
-
-- 3D stadium, pitch, crowd, and cinematic camera
-- Stylized insect characters (striker, partner, bowler, fielders)
-- Two batting-side players at the creases (no run animation / no run count)
-- Score **only** on fours & sixes; celebratory banners + confetti on boundaries
-- Bowled & caught dismissals
-- Difficulty ramp (pace + tighter windows)
-- High score via `localStorage`
-- Procedural Web Audio SFX
-- Responsive letterboxed WebGL view
-- Respects `prefers-reduced-motion` for camera/particles
-
-## Project layout
-
-```
-docs/                      Design notes
-src/engine/                Game loop, input, WebGL shell
-src/scenes/                3D play / match logic
-src/world/                 Stadium, bugs, camera, FX
-src/audio/                 Procedural sound
-src/ui/                    DOM overlays + match HUD
-src/config/                Constants
-src/utils/                 Math, storage
-```
+Output lands in `dist/`. Ready for GitHub Pages (this repo deploys on every push to `main` via Actions).
 
 ## License
 

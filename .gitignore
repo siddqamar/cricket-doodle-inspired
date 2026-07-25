@@ -3,3 +3,6 @@ dist
 .DS_Store
 *.local
 .vite
+
+# Internal design notes (local only — not for the public repo)
+docs/
