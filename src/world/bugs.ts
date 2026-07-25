@@ -289,6 +289,81 @@ export function setBowlerPhase(bug: THREE.Group, phase: number): void {
   if (held) held.visible = phase < 0.98;
 }
 
+/**
+ * End-to-end running bob + lean. `t` is free-running elapsed time;
+ * `intensity` 0 = idle reset, 1 = full sprint.
+ */
+export function setRunCycle(bug: THREE.Group, t: number, intensity = 1): void {
+  const body = bug.getObjectByName('body');
+  if (!body) return;
+  if (intensity <= 0.001) {
+    body.position.y = 0;
+    body.rotation.x = 0;
+    body.rotation.z = 0;
+    return;
+  }
+  const i = Math.min(1, intensity);
+  // Bob frequency scaled with the slower end-to-end run pace (~1.4s)
+  body.position.y = Math.abs(Math.sin(t * 11.2)) * 0.1 * i;
+  body.rotation.x = -0.12 * i + Math.sin(t * 11.2) * 0.04 * i;
+  body.rotation.z = Math.sin(t * 11.2) * 0.08 * i;
+}
+
+export type FielderPose = 'idle' | 'alert' | 'chase' | 'dive' | 'throw';
+
+/**
+ * Lightweight body language for fielders. Pose drives lean / crouch;
+ * `t` animates bob while chasing or celebrating a save.
+ */
+export function setFielderPose(
+  bug: THREE.Group,
+  pose: FielderPose,
+  t = 0,
+  intensity = 1,
+): void {
+  const body = bug.getObjectByName('body');
+  if (!body) return;
+  const i = Math.min(1, Math.max(0, intensity));
+
+  switch (pose) {
+    case 'idle':
+      body.position.y = Math.sin(t * 2) * 0.02;
+      body.rotation.x = 0;
+      body.rotation.z = 0;
+      break;
+    case 'alert':
+      body.position.y = 0.04 * i;
+      body.rotation.x = -0.08 * i;
+      body.rotation.z = Math.sin(t * 8) * 0.05 * i;
+      break;
+    case 'chase':
+      body.position.y = Math.abs(Math.sin(t * 16)) * 0.09 * i;
+      body.rotation.x = -0.18 * i;
+      body.rotation.z = Math.sin(t * 16) * 0.1 * i;
+      break;
+    case 'dive':
+      body.position.y = 0.02;
+      body.rotation.x = 0.55 * i;
+      body.rotation.z = 0.35 * i;
+      break;
+    case 'throw':
+      body.position.y = 0.06 * i;
+      body.rotation.x = -0.25 * i;
+      body.rotation.z = -0.15 * i;
+      break;
+  }
+}
+
+/** Reset body offsets after a play so idle stacking stays clean. */
+export function resetBugBody(bug: THREE.Group): void {
+  const body = bug.getObjectByName('body');
+  if (!body) return;
+  body.position.y = 0;
+  body.rotation.x = 0;
+  body.rotation.z = 0;
+  bug.position.y = 0;
+}
+
 export function createStumps(atBowlerEnd = false): THREE.Group {
   const g = new THREE.Group();
   const wood = mat(0x8b5a2b, { rough: 0.7 });

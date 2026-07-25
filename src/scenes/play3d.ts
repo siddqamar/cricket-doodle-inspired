@@ -3,7 +3,9 @@ import {
   CAM3D,
   DIFFICULTY,
   FIELD3D,
+  FIELDING,
   PHYSICS,
+  RUNNING,
   TIMING,
 } from '../config/constants';
 import { audio } from '../audio/audio';
@@ -12,9 +14,13 @@ import {
   breakStumps,
   createBug,
   createStumps,
+  type FielderPose,
+  resetBugBody,
   setBatSwing,
   setBowlerPhase,
   setCelebrate,
+  setFielderPose,
+  setRunCycle,
 } from '../world/bugs';
 import { buildStadium, createBall } from '../world/stadium';
 import { Fx3D } from '../world/fx3d';
@@ -34,10 +40,28 @@ type Phase =
   | 'result'
   | 'out';
 
-type ShotKind = 'dead' | 'four' | 'six' | 'bowled' | 'caught';
+type ShotKind =
+  | 'dead'
+  | 'one'
+  | 'two'
+  | 'three'
+  | 'four'
+  | 'six'
+  | 'bowled'
+  | 'caught';
+
+type FielderAI = {
+  group: THREE.Group;
+  home: THREE.Vector3;
+  pose: FielderPose;
+  reactionLeft: number;
+  gatherLeft: number;
+  diveT: number;
+};
 
 /**
- * 3D match: two batting bugs (no run chase UI), score only on boundaries.
+ * 3D match: running between wickets, active fielding, progressive difficulty.
+ * Boundaries still auto-score; singles/doubles resolve from chase vs crease time.
  */
 export class PlayScene3D {
   readonly scene = new THREE.Scene();
@@ -48,6 +72,8 @@ export class PlayScene3D {
   private phase: Phase = 'intro';
   private phaseT = 0;
   private time = 0;
+  private matchTime = 0;
+  private difficultyT = 0;
   private celebrate = 0;
   private cheer = 0;
   private resultHold: number = TIMING.deadBallHold;
@@ -69,6 +95,7 @@ export class PlayScene3D {
   private readonly partner: THREE.Group;
   private readonly bowler: THREE.Group;
   private readonly fielders: THREE.Group[] = [];
+  private readonly fielderAIs: FielderAI[] = [];
   private readonly stumpStriker: THREE.Group;
   private readonly stumpBowler: THREE.Group;
   private readonly ball: THREE.Mesh;
@@ -79,6 +106,21 @@ export class PlayScene3D {
   private ballActive = false;
   /** True once the ball has touched the ground after bat contact (kills catch & six). */
   private hasBouncedSinceHit = false;
+
+  /** Striker starts at +Z home crease; flips after odd completed runs. */
+  private strikerAtHome = true;
+  private running = false;
+  private runFrac = 0;
+  private completedRuns = 0;
+  private maxAttemptRuns = 0;
+  private allowTriple = false;
+  private runStartStrikerZ = FIELD3D.strikerZ as number;
+  private runStartPartnerZ = FIELD3D.partnerZ as number;
+  private runTargetStrikerZ = FIELD3D.partnerZ as number;
+  private runTargetPartnerZ = FIELD3D.strikerZ as number;
+
+  private readonly _chaseTarget = new THREE.Vector3();
+  private readonly _tmp = new THREE.Vector3();
 
   private delivery: {
     speed: number;
@@ -121,19 +163,14 @@ export class PlayScene3D {
     this.scene.add(this.fx.group);
 
     this.striker = createBug('striker', 1.05);
-    this.striker.position.set(FIELD3D.strikerX, 0, FIELD3D.strikerZ);
-    this.striker.rotation.y = Math.PI; // face bowler (-Z)
     this.scene.add(this.striker);
 
-    // Second batting-side player — stays at non-striker end (no run animation / no run count)
     this.partner = createBug('partner', 1);
-    this.partner.position.set(FIELD3D.partnerX, 0, FIELD3D.partnerZ);
-    this.partner.rotation.y = 0;
     this.scene.add(this.partner);
 
     this.bowler = createBug('bowler', 1.05);
     this.bowler.position.set(FIELD3D.bowlerX, 0, FIELD3D.bowlerStartZ);
-    this.bowler.rotation.y = 0; // faces +Z toward striker
+    this.bowler.rotation.y = 0;
     this.scene.add(this.bowler);
 
     this.stumpStriker = createStumps(false);
@@ -157,6 +194,14 @@ export class PlayScene3D {
       f.position.set(x!, 0, z!);
       f.lookAt(0, 0, 0);
       this.fielders.push(f);
+      this.fielderAIs.push({
+        group: f,
+        home: new THREE.Vector3(x!, 0, z!),
+        pose: 'idle',
+        reactionLeft: 0,
+        gatherLeft: 0,
+        diveT: 0,
+      });
       this.scene.add(f);
     }
 
@@ -177,6 +222,7 @@ export class PlayScene3D {
     this.shadow.visible = false;
     this.scene.add(this.shadow);
 
+    this.placeBattersAtCreases(true);
     this.resetMatch();
   }
 
@@ -184,6 +230,8 @@ export class PlayScene3D {
     this.score = 0;
     this.highScore = loadHighScore();
     this.deliveries = 0;
+    this.matchTime = 0;
+    this.difficultyT = 0;
     this.phase = 'intro';
     this.phaseT = 0;
     this.celebrate = 0;
@@ -193,6 +241,10 @@ export class PlayScene3D {
     this.ballActive = false;
     this.ball.visible = false;
     this.shadow.visible = false;
+    this.strikerAtHome = true;
+    this.resetRunState();
+    this.resetFieldersHome();
+    this.placeBattersAtCreases(true);
     this.fx.clear();
     this.cam.reset(true);
     this.pushHud();
@@ -202,20 +254,104 @@ export class PlayScene3D {
     this.events.onHud?.(this.score, this.highScore, this.deliveries, this.banner);
   }
 
+  /** 0 during easy era; ramps after first of ~2 min or ~30 runs. */
+  private updateDifficultyBlend(): void {
+    const easyOver =
+      this.matchTime >= DIFFICULTY.easyUntilSeconds ||
+      this.score >= DIFFICULTY.easyUntilScore;
+    if (!easyOver) {
+      this.difficultyT = 0;
+      return;
+    }
+    const pastTime = Math.max(0, this.matchTime - DIFFICULTY.easyUntilSeconds);
+    const pastScore = Math.max(0, this.score - DIFFICULTY.easyUntilScore);
+    this.difficultyT = clamp(
+      Math.max(pastTime / DIFFICULTY.rampTimeSpan, pastScore / DIFFICULTY.rampScoreSpan),
+      0,
+      1,
+    );
+  }
+
   private difficultySpeed(): number {
-    const s =
+    const full =
       PHYSICS.baseDeliverySpeed +
       Math.min(this.score * DIFFICULTY.speedPerScore, 12) +
       this.deliveries * DIFFICULTY.speedPerDelivery;
-    return clamp(s, PHYSICS.baseDeliverySpeed, PHYSICS.maxDeliverySpeed);
+    const capped = clamp(full, PHYSICS.baseDeliverySpeed, PHYSICS.maxDeliverySpeed);
+    // Easy era stays near base; ramp blends toward full challenge.
+    const blend = 0.18 + this.difficultyT * 0.82;
+    return lerp(PHYSICS.baseDeliverySpeed, capped, blend);
   }
 
   private difficultyWindowScale(): number {
-    return clamp(
-      1 - this.score / DIFFICULTY.windowScoreFactor,
-      DIFFICULTY.minWindowScale,
-      1,
-    );
+    const raw = 1 - this.score / DIFFICULTY.windowScoreFactor;
+    const blended = lerp(1, raw, 0.22 + this.difficultyT * 0.78);
+    return clamp(blended, DIFFICULTY.minWindowScale, 1);
+  }
+
+  private fielderSpeed(): number {
+    return lerp(FIELDING.baseSpeed, FIELDING.maxSpeed, this.difficultyT);
+  }
+
+  private fielderReaction(): number {
+    return lerp(FIELDING.reactionDelayEasy, FIELDING.reactionDelayHard, this.difficultyT);
+  }
+
+  private fielderLead(): number {
+    return lerp(FIELDING.leadEasy, FIELDING.leadHard, this.difficultyT);
+  }
+
+  private placeBattersAtCreases(snapFacing = false): void {
+    const homeX = FIELD3D.strikerX;
+    const awayX = FIELD3D.partnerX;
+    if (this.strikerAtHome) {
+      this.striker.position.set(homeX, 0, FIELD3D.strikerZ);
+      this.partner.position.set(awayX, 0, FIELD3D.partnerZ);
+      if (snapFacing) {
+        this.striker.rotation.y = Math.PI;
+        this.partner.rotation.y = 0;
+      }
+    } else {
+      this.striker.position.set(awayX, 0, FIELD3D.partnerZ);
+      this.partner.position.set(homeX, 0, FIELD3D.strikerZ);
+      if (snapFacing) {
+        this.striker.rotation.y = 0;
+        this.partner.rotation.y = Math.PI;
+      }
+    }
+    resetBugBody(this.striker);
+    resetBugBody(this.partner);
+  }
+
+  private resetRunState(): void {
+    this.running = false;
+    this.runFrac = 0;
+    this.completedRuns = 0;
+    this.maxAttemptRuns = 0;
+    this.allowTriple = false;
+  }
+
+  private resetFieldersHome(): void {
+    for (const ai of this.fielderAIs) {
+      ai.group.position.copy(ai.home);
+      ai.group.position.y = 0;
+      ai.group.lookAt(0, 0, 0);
+      ai.pose = 'idle';
+      ai.reactionLeft = 0;
+      ai.gatherLeft = 0;
+      ai.diveT = 0;
+      resetBugBody(ai.group);
+    }
+  }
+
+  private beginFieldingAlert(): void {
+    const reaction = this.fielderReaction();
+    for (const ai of this.fielderAIs) {
+      ai.reactionLeft = reaction * randRange(0.75, 1.2);
+      ai.gatherLeft = 0;
+      ai.diveT = 0;
+      ai.pose = 'alert';
+    }
   }
 
   private prepareDelivery(): void {
@@ -229,20 +365,26 @@ export class PlayScene3D {
     this.lastShot = null;
     this.banner = null;
     this.resultHold = TIMING.deadBallHold;
+    this.updateDifficultyBlend();
     this.windowScale = this.difficultyWindowScale();
     breakStumps(this.stumpStriker, 0);
+    this.resetRunState();
+    this.resetFieldersHome();
+    // Arcade: bat mesh always faces the next ball at the +Z crease.
+    // End-swaps from the previous scramble are shown during that play only.
+    this.strikerAtHome = true;
+    this.placeBattersAtCreases(true);
 
     const speed = this.difficultySpeed();
     const variance = clamp(
-      this.score / DIFFICULTY.varianceScoreFactor,
+      (this.score / DIFFICULTY.varianceScoreFactor) * (0.35 + this.difficultyT * 0.65),
       0,
       DIFFICULTY.maxVariance,
     );
-    // Bounce length along pitch (z)
     let bounceZ: number;
     const roll = Math.random();
-    if (roll < 0.25 + variance * 0.1) bounceZ = randRange(2, 5); // short
-    else if (roll > 0.78 - variance * 0.1) bounceZ = randRange(7.5, 9); // full
+    if (roll < 0.25 + variance * 0.1) bounceZ = randRange(2, 5);
+    else if (roll > 0.78 - variance * 0.1) bounceZ = randRange(7.5, 9);
     else bounceZ = randRange(5, 7.5);
 
     this.delivery = {
@@ -264,6 +406,7 @@ export class PlayScene3D {
       look: CAM3D.bowl.look,
       lerp: CAM3D.lerp,
     });
+    this.cam.setFov(CAM3D.defaultFov);
     this.pushHud();
   }
 
@@ -288,12 +431,12 @@ export class PlayScene3D {
     const gw = TIMING.goodWindow * this.windowScale;
     const ew = TIMING.edgeWindow * this.windowScale;
 
-    const bat = new THREE.Vector3(FIELD3D.strikerX, 1.0, FIELD3D.strikerZ);
+    const bat = this._tmp.set(FIELD3D.strikerX, 1.0, FIELD3D.strikerZ);
     const d = this.ballPos.distanceTo(bat);
     const inReach = d < 1.8 || this.ballPos.z > FIELD3D.strikerZ - 1.6;
 
     if (!inReach || abs > ew) {
-      return; // miss — may be bowled
+      return;
     }
 
     let quality: 'perfect' | 'good' | 'edge';
@@ -307,8 +450,7 @@ export class PlayScene3D {
     else if (quality === 'good') power = randRange(16, 22);
     else power = randRange(8, 12);
 
-    // Shoot into -X / -Z outfield (toward camera-left boundary)
-    const yaw = Math.PI + randRange(-0.55, 0.35); // mostly -X with some -Z
+    const yaw = Math.PI + randRange(-0.55, 0.35);
     const loft =
       quality === 'edge'
         ? 0.12
@@ -329,6 +471,9 @@ export class PlayScene3D {
     this.hasBouncedSinceHit = false;
     this.phase = 'hit_flight';
     this.phaseT = 0;
+    this.beginFieldingAlert();
+    this.beginRunningAfterHit(quality);
+
     audio.batHit(quality === 'perfect' ? 1 : quality === 'good' ? 0.8 : 0.45);
     this.cam.addShake(quality === 'perfect' ? 1.1 : 0.55);
     this.fx.burst(this.ballPos.clone(), 0xffffff, quality === 'edge' ? 8 : 16, this.reducedMotion);
@@ -339,8 +484,53 @@ export class PlayScene3D {
     });
   }
 
+  private beginRunningAfterHit(quality: 'perfect' | 'good' | 'edge'): void {
+    const flat = Math.hypot(this.ballVel.x, this.ballVel.z);
+    if (
+      flat < RUNNING.minRunFlatSpeed ||
+      (quality === 'edge' && flat < RUNNING.minRunFlatSpeed * 1.15)
+    ) {
+      this.resetRunState();
+      return;
+    }
+
+    // 1 common, 2 occasional; 3 only as rare highlight when ball stays in.
+    if (quality === 'perfect') this.maxAttemptRuns = 2;
+    else if (quality === 'good') this.maxAttemptRuns = flat > 12 ? 2 : 1;
+    else this.maxAttemptRuns = 1;
+
+    const tripleChance = lerp(
+      RUNNING.tripleChanceEasy,
+      RUNNING.tripleChanceHard,
+      this.difficultyT,
+    );
+    this.allowTriple =
+      quality !== 'edge' && flat > 13 && Math.random() < tripleChance;
+
+    this.running = true;
+    this.runFrac = 0;
+    this.completedRuns = 0;
+    this.armNextRunLegs();
+  }
+
+  private armNextRunLegs(): void {
+    this.runStartStrikerZ = this.striker.position.z;
+    this.runStartPartnerZ = this.partner.position.z;
+    // Cross the pitch: swap ends for this leg.
+    this.runTargetStrikerZ = this.strikerAtHome ? FIELD3D.partnerZ : FIELD3D.strikerZ;
+    this.runTargetPartnerZ = this.strikerAtHome ? FIELD3D.strikerZ : FIELD3D.partnerZ;
+    this.striker.rotation.y =
+      this.runTargetStrikerZ < this.runStartStrikerZ ? Math.PI : 0;
+    this.partner.rotation.y =
+      this.runTargetPartnerZ < this.runStartPartnerZ ? Math.PI : 0;
+  }
+
   update(dt: number, swingPressed: boolean): void {
     this.time += dt;
+    if (this.phase !== 'intro' && this.phase !== 'out') {
+      this.matchTime += dt;
+      this.updateDifficultyBlend();
+    }
     this.celebrate = Math.max(0, this.celebrate - dt);
     this.cheer = Math.max(0, this.cheer - dt * 0.5);
     this.fx.update(dt);
@@ -363,14 +553,25 @@ export class PlayScene3D {
       }
     }
     setBatSwing(this.striker, this.swinging ? this.batterSwingT : 0);
-    setCelebrate(this.striker, this.celebrate, this.time);
-    // Partner only does a light hop on big celebrations — never runs
-    setCelebrate(this.partner, this.celebrate * 0.55, this.time + 0.4);
 
-    // Subtle idle on fielders
-    for (let i = 0; i < this.fielders.length; i++) {
-      const f = this.fielders[i]!;
-      f.position.y = Math.sin(this.time * 2 + i) * 0.03;
+    if (this.running && this.phase === 'hit_flight') {
+      setRunCycle(this.striker, this.time, 1);
+      setRunCycle(this.partner, this.time + 0.15, 1);
+    } else if (this.celebrate > 0) {
+      setCelebrate(this.striker, this.celebrate, this.time);
+      setCelebrate(this.partner, this.celebrate * 0.55, this.time + 0.4);
+    } else if (this.phase !== 'hit_flight') {
+      resetBugBody(this.striker);
+      resetBugBody(this.partner);
+    }
+
+    if (this.phase !== 'hit_flight') {
+      for (let i = 0; i < this.fielderAIs.length; i++) {
+        const ai = this.fielderAIs[i]!;
+        if (ai.pose === 'idle' || ai.pose === 'alert') {
+          setFielderPose(ai.group, 'idle', this.time + i, 1);
+        }
+      }
     }
 
     switch (this.phase) {
@@ -517,7 +718,6 @@ export class PlayScene3D {
     this.ballVel.y -= PHYSICS.gravity * dt;
     this.ballPos.addScaledVector(this.ballVel, dt);
 
-    // Ground bounce — first contact after the hit sets bounce state for catch/boundary rules
     if (this.ballPos.y < 0.12) {
       this.ballPos.y = 0.12;
       this.hasBouncedSinceHit = true;
@@ -532,31 +732,46 @@ export class PlayScene3D {
       }
     }
 
-    // Catches — only on the full; a bounce makes the ball safe (not out)
+    this.updateRunning(dt);
+    if (this.updateFielders(dt)) return;
+
+    // Catches — only on the full; bounce makes the ball safe
     if (
       !this.hasBouncedSinceHit &&
-      this.ballPos.y > 0.6 &&
-      this.ballPos.y < 3.2 &&
+      this.ballPos.y > FIELDING.catchHeightMin &&
+      this.ballPos.y < FIELDING.catchHeightMax &&
       this.ballVel.y < 2
     ) {
-      for (const f of this.fielders) {
+      for (const ai of this.fielderAIs) {
+        if (ai.reactionLeft > 0) continue;
         const d = Math.hypot(
-          this.ballPos.x - f.position.x,
-          this.ballPos.z - f.position.z,
+          this.ballPos.x - ai.group.position.x,
+          this.ballPos.z - ai.group.position.z,
         );
-        if (d < 1.1 && Math.abs(this.ballPos.y - 1.0) < 1.2) {
+        if (d < FIELDING.catchRadius && Math.abs(this.ballPos.y - 1.0) < 1.25) {
           this.triggerOut('caught');
           return;
         }
       }
     }
 
-    // Camera follow
     const flatSpeed = Math.hypot(this.ballVel.x, this.ballVel.z);
     const lofted = this.ballPos.y > 2.2 || this.ballVel.y > 6;
-    this.cam.follow(this.ballPos, lofted ? 0.75 : 0.25, lofted ? 7 : 4);
+    const deep = Math.hypot(this.ballPos.x, this.ballPos.z) > FIELD3D.boundaryR * 0.55;
 
-    // Boundary — six only on the full; bounce before the rope is always four
+    // Camera: zoom in for running corridor, out for deep loft / boundary threat
+    if (this.running && !lofted && !deep) {
+      this.cam.frameRunning(
+        this._tmp.set(
+          (this.striker.position.x + this.partner.position.x) * 0.5,
+          0.9,
+          (this.striker.position.z + this.partner.position.z) * 0.5,
+        ),
+      );
+    } else {
+      this.cam.follow(this.ballPos, lofted || deep ? 0.75 : 0.25, lofted ? 7 : 4);
+    }
+
     const r = Math.hypot(this.ballPos.x, this.ballPos.z);
     if (r >= FIELD3D.boundaryR) {
       const clearsOnFull =
@@ -567,39 +782,236 @@ export class PlayScene3D {
       return;
     }
 
-    // Dead ball — in-field stop: NO run count, no celebration
-    if (
-      this.phaseT > 0.4 &&
-      flatSpeed < 1.2 &&
-      this.ballPos.y <= 0.15
-    ) {
-      this.finishDead();
+    // Ball dies in-field without a clean gather — award runs taken (incl. near-complete)
+    if (this.phaseT > 0.45 && flatSpeed < 1.15 && this.ballPos.y <= 0.15) {
+      this.finishRuns(this.runsToAward());
       return;
     }
 
-    if (this.phaseT > 2.6) {
-      this.finishDead();
+    // Let attempted 1/2/3 finish before force-ending the play
+    const attemptCap = this.allowTriple
+      ? RUNNING.maxRuns
+      : Math.max(1, Math.min(this.maxAttemptRuns, 2));
+    const runBudget =
+      attemptCap * RUNNING.runDuration + Math.max(0, attemptCap - 1) * RUNNING.turnExtra;
+    if (this.phaseT > Math.max(3.2, runBudget + 0.55)) {
+      this.finishRuns(this.runsToAward());
     }
   }
 
-  private finishDead(): void {
-    // Contact that is not a boundary: batters stay put, no +1/+2, no run flash
-    this.lastShot = 'dead';
+  /** Completed legs, plus the current leg if batters are nearly home. */
+  private runsToAward(): number {
+    const cap = this.allowTriple
+      ? RUNNING.maxRuns
+      : Math.min(this.maxAttemptRuns, 2);
+    let n = this.completedRuns;
+    if (
+      this.running &&
+      n < cap &&
+      this.runFrac >= RUNNING.nearCompleteFrac
+    ) {
+      n += 1;
+    }
+    return clamp(n, 0, RUNNING.maxRuns);
+  }
+
+  private updateRunning(dt: number): void {
+    if (!this.running) return;
+
+    const cap = this.allowTriple
+      ? RUNNING.maxRuns
+      : Math.min(this.maxAttemptRuns, 2);
+    if (this.completedRuns >= cap) {
+      this.running = false;
+      resetBugBody(this.striker);
+      resetBugBody(this.partner);
+      return;
+    }
+
+    const dur =
+      RUNNING.runDuration + (this.completedRuns > 0 ? RUNNING.turnExtra : 0);
+    this.runFrac += dt / dur;
+    const u = clamp(this.runFrac, 0, 1);
+    // Smoothstep for readable footwork
+    const e = u * u * (3 - 2 * u);
+
+    this.striker.position.z = lerp(this.runStartStrikerZ, this.runTargetStrikerZ, e);
+    this.partner.position.z = lerp(this.runStartPartnerZ, this.runTargetPartnerZ, e);
+    this.striker.position.x = lerp(
+      this.strikerAtHome ? FIELD3D.strikerX : FIELD3D.partnerX,
+      this.strikerAtHome ? FIELD3D.partnerX : FIELD3D.strikerX,
+      e,
+    );
+    this.partner.position.x = lerp(
+      this.strikerAtHome ? FIELD3D.partnerX : FIELD3D.strikerX,
+      this.strikerAtHome ? FIELD3D.strikerX : FIELD3D.partnerX,
+      e,
+    );
+
+    if (this.runFrac >= 1) {
+      this.completedRuns += 1;
+      this.strikerAtHome = !this.strikerAtHome;
+      this.runFrac = 0;
+      this.placeBattersAtCreases(true);
+
+      // Prefer 4 over inventing a 3: stop at 2 unless rare triple allowed
+      const nextCap = this.allowTriple ? RUNNING.maxRuns : Math.min(this.maxAttemptRuns, 2);
+      if (this.completedRuns >= nextCap) {
+        this.running = false;
+        resetBugBody(this.striker);
+        resetBugBody(this.partner);
+      } else {
+        this.armNextRunLegs();
+      }
+    }
+  }
+
+  /** @returns true if the play ended (fielded). */
+  private updateFielders(dt: number): boolean {
+    const speed = this.fielderSpeed();
+    const lead = this.fielderLead();
+    let nearestDist = Infinity;
+    let nearest: FielderAI | null = null;
+
+    for (const ai of this.fielderAIs) {
+      if (ai.diveT > 0) {
+        ai.diveT = Math.max(0, ai.diveT - dt);
+        setFielderPose(ai.group, 'dive', this.time, 1);
+        continue;
+      }
+
+      if (ai.reactionLeft > 0) {
+        ai.reactionLeft -= dt;
+        ai.pose = 'alert';
+        setFielderPose(ai.group, 'alert', this.time, 1);
+        // Face the ball while waiting
+        ai.group.lookAt(this.ballPos.x, 0, this.ballPos.z);
+        continue;
+      }
+
+      // Lead the bounce / roll path slightly
+      this._chaseTarget.set(
+        this.ballPos.x + this.ballVel.x * lead * 0.22,
+        0,
+        this.ballPos.z + this.ballVel.z * lead * 0.22,
+      );
+
+      const dx = this._chaseTarget.x - ai.group.position.x;
+      const dz = this._chaseTarget.z - ai.group.position.z;
+      const dist = Math.hypot(dx, dz);
+
+      if (dist > 0.05) {
+        const step = Math.min(dist, speed * dt);
+        ai.group.position.x += (dx / dist) * step;
+        ai.group.position.z += (dz / dist) * step;
+        ai.group.lookAt(this._chaseTarget.x, 0, this._chaseTarget.z);
+        ai.pose = 'chase';
+        setFielderPose(ai.group, 'chase', this.time, 1);
+      }
+
+      const ballDist = Math.hypot(
+        this.ballPos.x - ai.group.position.x,
+        this.ballPos.z - ai.group.position.z,
+      );
+      if (ballDist < nearestDist) {
+        nearestDist = ballDist;
+        nearest = ai;
+      }
+
+      // Ground save / gather
+      const canGather =
+        this.hasBouncedSinceHit ||
+        (this.ballPos.y <= 0.35 && Math.hypot(this.ballVel.x, this.ballVel.z) < 8);
+
+      if (canGather && ballDist < FIELDING.pickupRadius && this.ballPos.y < 1.2) {
+        if (ai.gatherLeft <= 0) {
+          ai.gatherLeft = FIELDING.gatherTime;
+          // Dive flourish on close saves
+          if (ballDist < FIELDING.pickupRadius * 0.65 && Math.hypot(this.ballVel.x, this.ballVel.z) > 3) {
+            ai.diveT = 0.35;
+            ai.pose = 'dive';
+          } else {
+            ai.pose = 'throw';
+            setFielderPose(ai.group, 'throw', this.time, 1);
+          }
+        } else {
+          ai.gatherLeft -= dt;
+          if (ai.gatherLeft <= 0) {
+            // Secure the ball — stop it and award runs taken so far
+            this.ballVel.set(0, 0, 0);
+            this.ballPos.y = 0.12;
+            ai.pose = 'throw';
+            setFielderPose(ai.group, 'throw', this.time, 1);
+            this.fx.burst(this.ballPos.clone(), 0xb8b0c0, 10, this.reducedMotion);
+            this.finishRuns(this.runsToAward());
+            return true;
+          }
+        }
+      }
+    }
+
+    // Nearest fielder slightly more aggressive cut-off
+    if (nearest && nearest.reactionLeft <= 0 && nearestDist < 4) {
+      nearest.pose = nearest.diveT > 0 ? 'dive' : 'chase';
+    }
+
+    return false;
+  }
+
+  private finishRuns(runs: number): void {
+    this.running = false;
+    resetBugBody(this.striker);
+    resetBugBody(this.partner);
+    this.placeBattersAtCreases(true);
+
+    const n = clamp(Math.floor(runs), 0, RUNNING.maxRuns);
+    if (n <= 0) {
+      this.lastShot = 'dead';
+      this.phase = 'result';
+      this.phaseT = 0;
+      this.resultHold = TIMING.deadBallHold;
+      this.ballActive = false;
+      this.banner = null;
+      this.cam.setPose({ pos: CAM3D.rest.pos, look: CAM3D.rest.look, lerp: CAM3D.lerp });
+      this.cam.setFov(CAM3D.defaultFov);
+      return;
+    }
+
+    this.score += n;
+    this.lastShot = n === 1 ? 'one' : n === 2 ? 'two' : 'three';
     this.phase = 'result';
     this.phaseT = 0;
-    this.resultHold = TIMING.deadBallHold;
+    this.resultHold = TIMING.resultHoldRun;
     this.ballActive = false;
-    this.banner = null;
-    this.cam.setPose({ pos: CAM3D.rest.pos, look: CAM3D.rest.look, lerp: CAM3D.lerp });
+    this.banner = n === 1 ? '1' : n === 2 ? '2' : '3';
+    this.celebrate = n >= 2 ? 0.7 : 0.35;
+    audio.cheer(n >= 2 ? 0.55 : 0.35);
+    this.cam.frameRunning(this._tmp.set(0, 0.9, 0));
+    this.fx.burst(
+      new THREE.Vector3(0, 1, (this.striker.position.z + this.partner.position.z) * 0.5),
+      0xf4d35e,
+      n >= 2 ? 14 : 8,
+      this.reducedMotion,
+    );
   }
 
   private finishBoundary(kind: 'four' | 'six'): void {
+    this.running = false;
+    resetBugBody(this.striker);
+    resetBugBody(this.partner);
+    // Boundaries don't change ends mid-scramble — reset to pre-shot ends? 
+    // Cricket: runs not taken on 4/6, batters return. Snap to creases without swap from partial runs.
+    // Undo any mid-run incomplete progress by using completedRuns only... actually on 4/6
+    // completed run crossings that finished should count for strike rotation only if laws-strict;
+    // arcade: return batters home without counting incomplete, keep completed swaps.
+    this.placeBattersAtCreases(true);
+
     this.lastShot = kind;
     const runs = kind === 'six' ? 6 : 4;
     this.score += runs;
     this.phase = 'result';
     this.phaseT = 0;
-    this.ballActive = true; // keep ball visible briefly
+    this.ballActive = true;
     this.resultHold = kind === 'six' ? TIMING.resultHoldSix : TIMING.resultHoldFour;
     this.celebrate = kind === 'six' ? 2.2 : 1.4;
     this.cheer = kind === 'six' ? 1.4 : 1;
@@ -641,7 +1053,6 @@ export class PlayScene3D {
         ],
         lerp: 3.5,
       });
-      // Keep ball drifting for drama
       if (this.ballActive) {
         this.ballPos.addScaledVector(this.ballVel, 0.016);
         this.ballVel.y -= 0.15;
@@ -652,10 +1063,19 @@ export class PlayScene3D {
         look: [this.ballPos.x, 0.5, this.ballPos.z],
         lerp: 4,
       });
+    } else if (
+      this.lastShot === 'one' ||
+      this.lastShot === 'two' ||
+      this.lastShot === 'three'
+    ) {
+      this.cam.frameRunning(this._tmp.set(0, 0.9, 0));
     }
   }
 
   private triggerOut(kind: 'bowled' | 'caught'): void {
+    this.running = false;
+    resetBugBody(this.striker);
+    resetBugBody(this.partner);
     this.lastShot = kind;
     this.phase = 'out';
     this.phaseT = 0;
@@ -678,6 +1098,5 @@ export class PlayScene3D {
 
   dispose(): void {
     this.fx.clear();
-    // Scene graphs disposed with renderer on game teardown if needed
   }
 }
