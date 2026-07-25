@@ -303,10 +303,10 @@ export function setRunCycle(bug: THREE.Group, t: number, intensity = 1): void {
     return;
   }
   const i = Math.min(1, intensity);
-  // Bob frequency scaled down with the slower end-to-end run pace
-  body.position.y = Math.abs(Math.sin(t * 8.5)) * 0.1 * i;
-  body.rotation.x = -0.12 * i + Math.sin(t * 8.5) * 0.04 * i;
-  body.rotation.z = Math.sin(t * 8.5) * 0.08 * i;
+  // Bob frequency scaled with the slower end-to-end run pace (~1.4s)
+  body.position.y = Math.abs(Math.sin(t * 11.2)) * 0.1 * i;
+  body.rotation.x = -0.12 * i + Math.sin(t * 11.2) * 0.04 * i;
+  body.rotation.z = Math.sin(t * 11.2) * 0.08 * i;
 }
 
 export type FielderPose = 'idle' | 'alert' | 'chase' | 'dive' | 'throw';

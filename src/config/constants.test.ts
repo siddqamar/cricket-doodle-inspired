@@ -44,8 +44,14 @@ describe('gameplay constants integrity', () => {
   it('keeps running params arcade-friendly', () => {
     expect(RUNNING.runDuration).toBeGreaterThan(0.5);
     expect(RUNNING.maxRuns).toBe(3);
+    expect(RUNNING.nearCompleteFrac).toBeGreaterThan(0.5);
+    expect(RUNNING.nearCompleteFrac).toBeLessThan(1);
     expect(RUNNING.tripleChanceEasy).toBeGreaterThan(RUNNING.tripleChanceHard);
     expect(RUNNING.tripleChanceHard).toBeGreaterThanOrEqual(0);
+    // Two runs + turn must stay in a playable window vs fielding
+    const twoRunBudget =
+      RUNNING.runDuration * 2 + RUNNING.turnExtra;
+    expect(twoRunBudget).toBeLessThan(4);
   });
 
   it('makes hard fielding faster and more reactive than easy', () => {
@@ -54,6 +60,10 @@ describe('gameplay constants integrity', () => {
     expect(FIELDING.leadHard).toBeGreaterThan(FIELDING.leadEasy);
     expect(FIELDING.pickupRadius).toBeGreaterThan(0);
     expect(FIELDING.catchRadius).toBeGreaterThan(0);
+    // Fielders should not outpace a full crease-to-crease sprint by a huge margin
+    const pitchLen = FIELD3D.strikerZ - FIELD3D.partnerZ;
+    const runSpeed = pitchLen / RUNNING.runDuration;
+    expect(FIELDING.baseSpeed).toBeLessThan(runSpeed * 1.15);
   });
 
   it('defines camera presets with 3-component vectors', () => {

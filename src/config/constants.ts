@@ -77,16 +77,22 @@ export const DIFFICULTY = {
 
 /** Running between wickets (auto-run resolution; animation sells it). */
 export const RUNNING = {
-  /** Seconds to complete one end-to-end run at base pace. */
-  runDuration: 1.85,
+  /**
+   * Seconds to complete one end-to-end run at base pace.
+   * ~25% slower than the original 1.12s so footwork reads, without
+   * letting fielders always cut off the second run.
+   */
+  runDuration: 1.4,
   /** Slightly slower turn for the second/third run. */
-  turnExtra: 0.22,
+  turnExtra: 0.16,
   maxRuns: 3,
   /**
    * Horizontal speed of the ball (approx) needed before batters attempt a run.
    * Soft edges / defended balls stay dots.
    */
   minRunFlatSpeed: 4.5,
+  /** If gather happens this far through a leg, still credit the run. */
+  nearCompleteFrac: 0.78,
   /** Chance (0–1) a deep misfield allows a rare triple when otherwise 2. */
   tripleChanceEasy: 0.14,
   tripleChanceHard: 0.04,
@@ -95,22 +101,22 @@ export const RUNNING = {
 /** Active fielding: chase, catch on the full, save runs on the ground. */
 export const FIELDING = {
   /** Reaction delay before fielders start chasing (seconds). */
-  reactionDelayEasy: 0.38,
-  reactionDelayHard: 0.1,
-  /** Chase speeds (world units / s). */
-  baseSpeed: 4.2,
-  maxSpeed: 7.6,
+  reactionDelayEasy: 0.45,
+  reactionDelayHard: 0.14,
+  /** Chase speeds (world units / s) — kept a hair under the slower batters. */
+  baseSpeed: 3.7,
+  maxSpeed: 6.8,
   /** How hard fielders lead the ball (prediction strength 0–1). */
-  leadEasy: 0.25,
-  leadHard: 0.7,
+  leadEasy: 0.22,
+  leadHard: 0.62,
   pickupRadius: 1.05,
   catchRadius: 1.15,
   catchHeightMin: 0.55,
   catchHeightMax: 3.1,
   /** Seconds to secure the ball after reaching it on the ground. */
-  gatherTime: 0.22,
+  gatherTime: 0.28,
   /** Idle return speed when ball is dead. */
-  returnSpeed: 3.2,
+  returnSpeed: 3.0,
 } as const;
 
 /** Cinematic camera presets (world space). */

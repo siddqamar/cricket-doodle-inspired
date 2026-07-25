@@ -782,15 +782,37 @@ export class PlayScene3D {
       return;
     }
 
-    // Ball dies in-field without a clean gather — award completed runs
+    // Ball dies in-field without a clean gather — award runs taken (incl. near-complete)
     if (this.phaseT > 0.45 && flatSpeed < 1.15 && this.ballPos.y <= 0.15) {
-      this.finishRuns(this.completedRuns);
+      this.finishRuns(this.runsToAward());
       return;
     }
 
-    if (this.phaseT > 3.2) {
-      this.finishRuns(this.completedRuns);
+    // Let attempted 1/2/3 finish before force-ending the play
+    const attemptCap = this.allowTriple
+      ? RUNNING.maxRuns
+      : Math.max(1, Math.min(this.maxAttemptRuns, 2));
+    const runBudget =
+      attemptCap * RUNNING.runDuration + Math.max(0, attemptCap - 1) * RUNNING.turnExtra;
+    if (this.phaseT > Math.max(3.2, runBudget + 0.55)) {
+      this.finishRuns(this.runsToAward());
     }
+  }
+
+  /** Completed legs, plus the current leg if batters are nearly home. */
+  private runsToAward(): number {
+    const cap = this.allowTriple
+      ? RUNNING.maxRuns
+      : Math.min(this.maxAttemptRuns, 2);
+    let n = this.completedRuns;
+    if (
+      this.running &&
+      n < cap &&
+      this.runFrac >= RUNNING.nearCompleteFrac
+    ) {
+      n += 1;
+    }
+    return clamp(n, 0, RUNNING.maxRuns);
   }
 
   private updateRunning(dt: number): void {
@@ -921,7 +943,7 @@ export class PlayScene3D {
             ai.pose = 'throw';
             setFielderPose(ai.group, 'throw', this.time, 1);
             this.fx.burst(this.ballPos.clone(), 0xb8b0c0, 10, this.reducedMotion);
-            this.finishRuns(this.completedRuns);
+            this.finishRuns(this.runsToAward());
             return true;
           }
         }
