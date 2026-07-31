@@ -120,6 +120,107 @@ export class AudioEngine {
     });
   }
 
+  /** Booming craze cheer and horn blast when hitting a FOUR. */
+  cheerCrazyFour(): void {
+    void this.ensure().then(() => {
+      if (!this.ctx || !this.out()) return;
+      this.noiseBurst(0.9, 0.35, 950, true);
+      this.noiseBurst(1.2, 0.22, 1600, true);
+      const t = this.now();
+
+      for (let h = 0; h < 2; h++) {
+        const hOsc = this.ctx.createOscillator();
+        const hGain = this.ctx.createGain();
+        hOsc.type = 'sawtooth';
+        const startH = t + h * 0.18;
+        hOsc.frequency.setValueAtTime(440, startH);
+        hOsc.frequency.exponentialRampToValueAtTime(580, startH + 0.12);
+        hGain.gain.setValueAtTime(0.0001, startH);
+        hGain.gain.linearRampToValueAtTime(0.18, startH + 0.03);
+        hGain.gain.exponentialRampToValueAtTime(0.0001, startH + 0.16);
+        hOsc.connect(hGain);
+        hGain.connect(this.out()!);
+        hOsc.start(startH);
+        hOsc.stop(startH + 0.18);
+      }
+
+      for (let i = 0; i < 12; i++) {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = i % 3 === 0 ? 'square' : 'triangle';
+        const f = 300 + Math.random() * 800;
+        const start = t + i * 0.04;
+        osc.frequency.setValueAtTime(f, start);
+        osc.frequency.linearRampToValueAtTime(f * (1 + (Math.random() * 0.3 - 0.15)), start + 0.25);
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.exponentialRampToValueAtTime(0.12, start + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, start + 0.45);
+        osc.connect(g);
+        g.connect(this.out()!);
+        osc.start(start);
+        osc.stop(start + 0.48);
+      }
+    });
+  }
+
+  /** Massive roaring crowd craze shouting crescendo + stadium horn blast for SIX. */
+  cheerCrazySix(): void {
+    void this.ensure().then(() => {
+      if (!this.ctx || !this.out()) return;
+      const t = this.now();
+
+      const sub = this.ctx.createOscillator();
+      const subG = this.ctx.createGain();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(130, t);
+      sub.frequency.exponentialRampToValueAtTime(35, t + 0.45);
+      subG.gain.setValueAtTime(0.0001, t);
+      subG.gain.linearRampToValueAtTime(0.5, t + 0.02);
+      subG.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      sub.connect(subG);
+      subG.connect(this.out()!);
+      sub.start(t);
+      sub.stop(t + 0.52);
+
+      this.noiseBurst(1.4, 0.42, 800, true);
+      this.noiseBurst(1.8, 0.28, 1800, true);
+
+      for (let h = 0; h < 3; h++) {
+        const hOsc = this.ctx.createOscillator();
+        const hGain = this.ctx.createGain();
+        hOsc.type = 'sawtooth';
+        const startH = t + h * 0.14;
+        const baseF = 350 + h * 120;
+        hOsc.frequency.setValueAtTime(baseF, startH);
+        hOsc.frequency.exponentialRampToValueAtTime(baseF * 1.35, startH + 0.2);
+        hGain.gain.setValueAtTime(0.0001, startH);
+        hGain.gain.linearRampToValueAtTime(0.22, startH + 0.04);
+        hGain.gain.exponentialRampToValueAtTime(0.0001, startH + 0.25);
+        hOsc.connect(hGain);
+        hGain.connect(this.out()!);
+        hOsc.start(startH);
+        hOsc.stop(startH + 0.27);
+      }
+
+      for (let i = 0; i < 18; i++) {
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = i % 2 === 0 ? 'sine' : 'sawtooth';
+        const f = 250 + Math.random() * 950;
+        const start = t + i * 0.03;
+        osc.frequency.setValueAtTime(f, start);
+        osc.frequency.exponentialRampToValueAtTime(f * 1.2, start + 0.3);
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.exponentialRampToValueAtTime(0.14, start + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, start + 0.55);
+        osc.connect(g);
+        g.connect(this.out()!);
+        osc.start(start);
+        osc.stop(start + 0.58);
+      }
+    });
+  }
+
   wicket(): void {
     void this.ensure().then(() => {
       if (!this.ctx || !this.out()) return;

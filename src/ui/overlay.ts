@@ -1,4 +1,6 @@
 import { audio } from '../audio/audio';
+import { SKINS, type SkinId, loadSkin, saveSkin } from '../config/skins';
+import { icon } from './icons';
 
 export type OverlayMode = 'title' | 'instructions' | 'paused' | 'gameover' | 'hidden';
 
@@ -10,6 +12,7 @@ export type OverlayHandlers = {
   onHideInstructions: () => void;
   onToggleSound: () => void;
   onPause: () => void;
+  onSelectSkin: (id: SkinId) => void;
 };
 
 export class Overlay {
@@ -18,6 +21,7 @@ export class Overlay {
   private handlers: OverlayHandlers;
   private lastScore = 0;
   private lastHigh = 0;
+  private selectedSkin: SkinId = loadSkin();
 
   constructor(root: HTMLElement, handlers: OverlayHandlers) {
     this.root = root;
@@ -44,14 +48,22 @@ export class Overlay {
       const top = document.createElement('div');
       top.className = 'top-controls';
       top.append(
-        this.iconBtn(audio.muted ? '🔇' : '🔊', 'Toggle sound', () => {
-          this.handlers.onToggleSound();
-          this.render();
-        }),
-        this.iconBtn(this.mode === 'paused' ? '▶️' : '⏸️', 'Pause', () => {
-          if (this.mode === 'paused') this.handlers.onResume();
-          else this.handlers.onPause();
-        }),
+        this.iconBtn(
+          audio.muted ? icon('sound_off', 20) : icon('sound_on', 20),
+          'Toggle sound',
+          () => {
+            this.handlers.onToggleSound();
+            this.render();
+          },
+        ),
+        this.iconBtn(
+          this.mode === 'paused' ? icon('play', 20) : icon('pause', 20),
+          'Pause',
+          () => {
+            if (this.mode === 'paused') this.handlers.onResume();
+            else this.handlers.onPause();
+          },
+        ),
       );
       this.root.appendChild(top);
     }
@@ -71,7 +83,7 @@ export class Overlay {
       const row = document.createElement('div');
       row.className = 'btn-row';
       row.append(
-        this.btn('Resume', () => this.handlers.onResume()),
+        this.btn(`${icon('play', 18)} Resume`, () => this.handlers.onResume()),
         this.btn('Restart', () => this.handlers.onRestart(), 'secondary'),
       );
       panel.appendChild(row);
@@ -86,13 +98,13 @@ export class Overlay {
       panel.innerHTML = `
         <h1>Out!</h1>
         <div class="score-big">${this.lastScore}</div>
-        <p class="meta">${isNew ? '🏆 New high score!' : `Best: ${this.lastHigh}`}</p>
+        <p class="meta">${isNew ? `${icon('trophy', 18)} New high score!` : `Best: ${this.lastHigh}`}</p>
         <p class="tagline">One more over?</p>
       `;
       const row = document.createElement('div');
       row.className = 'btn-row';
       row.append(
-        this.btn('Play Again', () => this.handlers.onPlay()),
+        this.btn(`${icon('play', 18)} Play Again`, () => this.handlers.onPlay()),
         this.btn('Title', () => this.handlers.onHideInstructions(), 'ghost'),
       );
       panel.appendChild(row);
@@ -118,7 +130,7 @@ export class Overlay {
       row.className = 'btn-row';
       row.append(
         this.btn('Got it', () => this.handlers.onHideInstructions()),
-        this.btn('Play', () => this.handlers.onPlay(), 'secondary'),
+        this.btn(`${icon('play', 18)} Play`, () => this.handlers.onPlay(), 'secondary'),
       );
       panel.appendChild(row);
       this.root.appendChild(panel);
@@ -129,19 +141,64 @@ export class Overlay {
     const panel = document.createElement('div');
     panel.className = 'panel';
     panel.innerHTML = `
-      <h1>Pitch Bugs</h1>
+      <h1>${icon('sparkle', 32)} Pitch Bugs</h1>
       <p class="tagline">3D insect cricket. Smash boundaries, run the gaps, watch fielders scramble.</p>
-      <p class="meta">Best: ${this.lastHigh}</p>
+      <p class="meta">${icon('trophy', 18)} Best: ${this.lastHigh}</p>
     `;
+
+    const skinsSection = document.createElement('div');
+    skinsSection.className = 'skin-selector';
+    const skinsLabel = document.createElement('div');
+    skinsLabel.className = 'skin-selector-label';
+    skinsLabel.innerHTML = `${icon('palette', 16)} Choose Arena & Species`;
+    skinsSection.appendChild(skinsLabel);
+
+    const cards = document.createElement('div');
+    cards.className = 'skin-grid';
+    for (const skin of Object.values(SKINS)) {
+      const card = document.createElement('div');
+      card.className = 'skin-card' + (skin.id === this.selectedSkin ? ' active' : '');
+      const hexShell = '#' + skin.palettes.striker.shell.toString(16).padStart(6, '0');
+      const hexBelly = '#' + skin.palettes.striker.belly.toString(16).padStart(6, '0');
+      const hexAccent = '#' + skin.palettes.striker.accent.toString(16).padStart(6, '0');
+      card.innerHTML = `
+        <div class="skin-icon">${icon(skin.icon as any, 28)}</div>
+        <div class="skin-info">
+          <div class="skin-name">${skin.name}</div>
+          <div class="skin-desc">${skin.description}</div>
+        </div>
+        <div class="skin-swatches">
+          <div class="skin-swatch" style="background:${hexShell}"></div>
+          <div class="skin-swatch" style="background:${hexBelly}"></div>
+          <div class="skin-swatch" style="background:${hexAccent}"></div>
+        </div>
+      `;
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        audio.click();
+        saveSkin(skin.id);
+        this.selectedSkin = skin.id;
+        this.handlers.onSelectSkin(skin.id);
+        this.render();
+      });
+      cards.appendChild(card);
+    }
+    skinsSection.appendChild(cards);
+    panel.appendChild(skinsSection);
+
     const row = document.createElement('div');
     row.className = 'btn-row';
     row.append(
-      this.btn('Play', () => this.handlers.onPlay()),
-      this.btn('Instructions', () => this.handlers.onShowInstructions(), 'secondary'),
-      this.btn(audio.muted ? 'Sound Off' : 'Sound On', () => {
-        this.handlers.onToggleSound();
-        this.render();
-      }, 'ghost'),
+      this.btn(`${icon('play', 18)} Play`, () => this.handlers.onPlay()),
+      this.btn(`${icon('settings', 18)} Instructions`, () => this.handlers.onShowInstructions(), 'secondary'),
+      this.btn(
+        audio.muted ? `${icon('sound_off', 18)} Sound Off` : `${icon('sound_on', 18)} Sound On`,
+        () => {
+          this.handlers.onToggleSound();
+          this.render();
+        },
+        'ghost',
+      ),
     );
     panel.appendChild(row);
     this.root.appendChild(panel);
@@ -155,7 +212,7 @@ export class Overlay {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn' + (variant === 'primary' ? '' : ` ${variant}`);
-    b.textContent = label;
+    b.innerHTML = label;
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       audio.click();
@@ -168,7 +225,7 @@ export class Overlay {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'icon-btn';
-    b.textContent = label;
+    b.innerHTML = label;
     b.setAttribute('aria-label', aria);
     b.addEventListener('click', (e) => {
       e.stopPropagation();

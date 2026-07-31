@@ -8,6 +8,7 @@ import { loadHighScore } from '../utils/storage';
 import { buildStadium } from '../world/stadium';
 import { createBug } from '../world/bugs';
 import { CAM3D } from '../config/constants';
+import { SKINS, loadSkin, type SkinId } from '../config/skins';
 
 type Mode = 'title' | 'instructions' | 'playing' | 'paused' | 'gameover';
 
@@ -30,6 +31,7 @@ export class Game {
   private gameOverScore = 0;
   private gameOverHigh = 0;
   private raf = 0;
+  private currentSkinId: SkinId = loadSkin();
 
   private hudEl: HTMLDivElement | null = null;
   private bannerEl: HTMLDivElement | null = null;
@@ -70,6 +72,10 @@ export class Game {
         audio.toggleMute();
       },
       onPause: () => this.pause(),
+      onSelectSkin: (id: SkinId) => {
+        this.currentSkinId = id;
+        this.buildTitleScene();
+      },
     });
 
     this.ensureHud(shell);
@@ -97,23 +103,24 @@ export class Game {
   }
 
   private buildTitleScene(): void {
+    const skin = SKINS[this.currentSkinId];
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xbfe9ff, 0x2d6a4f, 0.9));
     const sun = new THREE.DirectionalLight(0xfff2d6, 1.1);
     sun.position.set(10, 18, 6);
     sun.castShadow = true;
     scene.add(sun);
-    scene.add(buildStadium());
+    scene.add(buildStadium(skin));
 
-    const s = createBug('striker', 1.2);
+    const s = createBug('striker', 1.2, skin.palettes.striker, skin.shellShader);
     s.position.set(0.4, 0, 6);
     s.rotation.y = Math.PI + 0.4;
     scene.add(s);
-    const p = createBug('partner', 1.1);
+    const p = createBug('partner', 1.1, skin.palettes.partner, skin.shellShader);
     p.position.set(-1.2, 0, 5.2);
     p.rotation.y = Math.PI - 0.3;
     scene.add(p);
-    const b = createBug('bowler', 1.15);
+    const b = createBug('bowler', 1.15, skin.palettes.bowler, skin.shellShader);
     b.position.set(0, 0, -4);
     scene.add(b);
 
@@ -190,14 +197,19 @@ export class Game {
     audio.startAmbience();
     this.play?.dispose();
     this.cam.reset(true);
-    this.play = new PlayScene3D(this.cam, {
-      onGameOver: (score, high) => {
-        this.gameOverScore = score;
-        this.gameOverHigh = high;
-        this.setMode('gameover');
+    const skin = SKINS[this.currentSkinId];
+    this.play = new PlayScene3D(
+      this.cam,
+      {
+        onGameOver: (score, high) => {
+          this.gameOverScore = score;
+          this.gameOverHigh = high;
+          this.setMode('gameover');
+        },
+        onHud: (score, high, balls, banner) => this.updateHud(score, high, balls, banner),
       },
-      onHud: (score, high, balls, banner) => this.updateHud(score, high, balls, banner),
-    });
+      skin,
+    );
     this.setMode('playing');
   }
 

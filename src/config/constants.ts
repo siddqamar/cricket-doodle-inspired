@@ -137,3 +137,25 @@ export const CAM3D = {
   runningFov: 42,
   defaultFov: 48,
 } as const;
+
+/** Probabilistic catch/drop system — adds drama to deterministic positions. */
+export const UNCERTAINTY = {
+  /** Base chance a fielder DROPS a regulation catch (0–1). */
+  dropChanceBase: 0.12,
+  /** Extra drop chance for diving catches. */
+  dropChanceDive: 0.25,
+  /** Drop chance reduction at max difficulty (harder = fewer drops). */
+  dropChanceReductionAtMax: 0.06,
+  /** Base chance a fielder makes a MIRACLE catch just outside normal radius. */
+  miracleChanceBase: 0.08,
+  /** Extended radius multiplier for miracle catch zone (× catchRadius). */
+  miracleRadiusMult: 1.55,
+  /** Miracle chance boost for edge shots. */
+  miracleEdgeBoost: 0.07,
+  /** Minimum altitude for miracle catches. */
+  miracleHeightMin: 0.4,
+  /** Chance a fast ball slips through gathering fielder's hands. */
+  misfieldChance: 0.06,
+  /** Extra runs awarded on misfield overthrow. */
+  overthrowMaxExtra: 1,
+} as const;
