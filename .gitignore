@@ -6,3 +6,5 @@ dist
 
 # Internal design notes (local only — not for the public repo)
 docs/
+.cursor
+config.bat

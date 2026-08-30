@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { glowTrailMaterial } from './shaders';
 
 type Particle = {
   mesh: THREE.Mesh;
@@ -75,6 +76,48 @@ export class Fx3D {
       vel,
       life: 0.6 + Math.random() * 0.7,
       maxLife: 1.3,
+    });
+  }
+
+  /** Spawn glow trail particles behind a fast-moving ball. */
+  trail(pos: THREE.Vector3, vel: THREE.Vector3, color: number, reduced = false): void {
+    const speed = vel.length();
+    if (speed < 8 || reduced) return;
+    const count = Math.min(3, Math.floor(speed / 10));
+    for (let i = 0; i < count; i++) {
+      const trailPos = pos.clone().addScaledVector(vel.clone().normalize(), -i * 0.3);
+      this.spawnTrail(trailPos, color, 0.06 - i * 0.015);
+    }
+  }
+
+  /** Radial trail burst for dramatic moments. */
+  trailBurst(pos: THREE.Vector3, color: number, n = 8, reduced = false): void {
+    const count = reduced ? Math.ceil(n * 0.3) : n;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const p = pos.clone();
+      p.x += Math.cos(a) * 0.3;
+      p.z += Math.sin(a) * 0.3;
+      this.spawnTrail(p, color, 0.05);
+    }
+  }
+
+  private spawnTrail(pos: THREE.Vector3, color: number, size: number): void {
+    if (this.particles.length >= this.max) {
+      const old = this.particles.shift()!;
+      this.group.remove(old.mesh);
+      old.mesh.geometry.dispose();
+      (old.mesh.material as THREE.Material).dispose();
+    }
+    const geo = new THREE.SphereGeometry(size, 4, 4);
+    const mesh = new THREE.Mesh(geo, glowTrailMaterial(color));
+    mesh.position.copy(pos);
+    this.group.add(mesh);
+    this.particles.push({
+      mesh,
+      vel: new THREE.Vector3(0, 0, 0),
+      life: 0.25 + Math.random() * 0.15,
+      maxLife: 0.4,
     });
   }
 

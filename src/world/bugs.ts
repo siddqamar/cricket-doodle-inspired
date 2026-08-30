@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { iridescentShellMaterial, metallicShellMaterial, holographicShellMaterial } from './shaders';
 
 export type BugKind = 'striker' | 'partner' | 'bowler' | 'fielder';
 
@@ -11,7 +12,7 @@ export type BugPalette = {
   helmet?: number;
 };
 
-const PALETTES: Record<BugKind, BugPalette> = {
+export const PALETTES: Record<BugKind, BugPalette> = {
   striker: {
     shell: 0x2d6a4f,
     belly: 0x95d5b2,
@@ -54,11 +55,29 @@ function mat(color: number, opts?: { rough?: number; metal?: number; emissive?: 
   });
 }
 
+function getShellMaterial(color: number, accentColor: number, shaderType?: string): THREE.Material {
+  switch (shaderType) {
+    case 'iridescent':
+      return iridescentShellMaterial(color, accentColor);
+    case 'metallic':
+      return metallicShellMaterial(color);
+    case 'holographic':
+      return holographicShellMaterial(color);
+    default:
+      return mat(color, { rough: 0.4, metal: 0.15 });
+  }
+}
+
 /**
  * Stylized cricket-insect hero: shell, big eyes, antennae, optional bat/helmet.
  */
-export function createBug(kind: BugKind, scale = 1): THREE.Group {
-  const p = PALETTES[kind];
+export function createBug(
+  kind: BugKind,
+  scale = 1,
+  palette?: BugPalette,
+  shellShader?: 'standard' | 'iridescent' | 'metallic' | 'holographic',
+): THREE.Group {
+  const p = palette ?? PALETTES[kind];
   const root = new THREE.Group();
   root.name = kind;
   root.userData.kind = kind;
@@ -67,10 +86,12 @@ export function createBug(kind: BugKind, scale = 1): THREE.Group {
   body.name = 'body';
   root.add(body);
 
+  const shellMat = getShellMaterial(p.shell, p.accent, shellShader);
+
   // Abdomen shell with ridge stripe
   const shell = new THREE.Mesh(
-    new THREE.SphereGeometry(0.42, 18, 14),
-    mat(p.shell, { rough: 0.4, metal: 0.15 }),
+    new THREE.SphereGeometry(0.42, 24, 18),
+    shellMat,
   );
   shell.scale.set(1, 0.85, 1.25);
   shell.position.set(0, 0.55, 0);
@@ -83,6 +104,16 @@ export function createBug(kind: BugKind, scale = 1): THREE.Group {
   );
   stripe.position.set(0, 0.88, 0.05);
   body.add(stripe);
+
+  // Thorax segment
+  const thorax = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 14, 10),
+    shellMat,
+  );
+  thorax.scale.set(0.9, 0.7, 0.8);
+  thorax.position.set(0, 0.6, 0.22);
+  thorax.castShadow = true;
+  body.add(thorax);
 
   // Belly
   const belly = new THREE.Mesh(
@@ -100,16 +131,28 @@ export function createBug(kind: BugKind, scale = 1): THREE.Group {
   body.add(head);
 
   const skull = new THREE.Mesh(
-    new THREE.SphereGeometry(0.26, 16, 14),
-    mat(p.shell, { rough: 0.45 }),
+    new THREE.SphereGeometry(0.26, 20, 16),
+    shellMat,
   );
   skull.castShadow = true;
   head.add(skull);
 
+  // Mandibles
+  for (const side of [-1, 1]) {
+    const mandible = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.01, 0.12, 6),
+      mat(p.limb, { rough: 0.5 }),
+    );
+    mandible.position.set(side * 0.08, -0.12, 0.2);
+    mandible.rotation.z = side * 0.4;
+    mandible.rotation.x = 0.6;
+    head.add(mandible);
+  }
+
   // Glossy compound eyes
   for (const side of [-1, 1]) {
     const eyeWhite = new THREE.Mesh(
-      new THREE.SphereGeometry(0.11, 12, 10),
+      new THREE.SphereGeometry(0.11, 14, 12),
       mat(p.eye, { rough: 0.25, metal: 0.05 }),
     );
     eyeWhite.position.set(side * 0.14, 0.04, 0.18);
@@ -178,10 +221,18 @@ export function createBug(kind: BugKind, scale = 1): THREE.Group {
   }
 
   // Wings / elytra hints
+  const wingMat = new THREE.MeshStandardMaterial({
+    color: p.belly,
+    roughness: 0.2,
+    metalness: 0.3,
+    transparent: true,
+    opacity: 0.55,
+    side: THREE.DoubleSide,
+  });
   for (const side of [-1, 1]) {
     const wing = new THREE.Mesh(
       new THREE.SphereGeometry(0.22, 10, 8, 0, Math.PI),
-      mat(p.belly, { rough: 0.3, metal: 0.2 }),
+      wingMat,
     );
     wing.scale.set(0.55, 0.25, 0.9);
     wing.position.set(side * 0.28, 0.7, -0.05);

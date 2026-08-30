@@ -33,6 +33,8 @@ export class Camera3D {
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(CAM3D.defaultFov, aspect, 0.1, 200);
+    this.camera.fov = this.getAspectAdjustedFov(CAM3D.defaultFov);
+    this.camera.updateProjectionMatrix();
     this.camera.position.copy(this.curPos);
     this.camera.lookAt(this.curLook);
     this.reducedMotion = window.matchMedia?.(
@@ -40,8 +42,20 @@ export class Camera3D {
     ).matches;
   }
 
+  getAspectAdjustedFov(baseFov: number): number {
+    const aspect = this.camera.aspect || (16 / 9);
+    const designAspect = 16 / 9;
+    if (aspect < designAspect) {
+      // Keep horizontal FOV constant when aspect is narrower than 16:9
+      const vFovRad = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * (designAspect / aspect));
+      return (vFovRad * 180) / Math.PI;
+    }
+    return baseFov;
+  }
+
   setAspect(aspect: number): void {
     this.camera.aspect = aspect;
+    this.camera.fov = this.getAspectAdjustedFov(this.curFov);
     this.camera.updateProjectionMatrix();
   }
 
@@ -77,7 +91,7 @@ export class Camera3D {
     this.targetFov = f;
     if (snap) {
       this.curFov = f;
-      this.camera.fov = f;
+      this.camera.fov = this.getAspectAdjustedFov(f);
       this.camera.updateProjectionMatrix();
     }
   }
@@ -87,13 +101,30 @@ export class Camera3D {
     this.shake = Math.max(this.shake, a);
   }
 
+  /** Quick dramatic zoom-in for miracle catches / stunner moments. */
+  dramaticZoom(target: THREE.Vector3, intensity = 1): void {
+    const dist = 4 + (1 - intensity) * 4;
+    this.setPose({
+      pos: new THREE.Vector3(
+        target.x + dist * 0.4,
+        target.y + 2,
+        target.z + dist * 0.5,
+      ),
+      look: new THREE.Vector3(target.x, target.y + 0.5, target.z),
+      lerp: CAM3D.hitLerp * 1.5,
+    });
+    this.setFov(CAM3D.defaultFov - 8 * intensity);
+    this.addShake(intensity * 1.5);
+  }
+
   update(dt: number): void {
     const t = 1 - Math.exp(-this.rate * dt);
     this.curPos.lerp(this.targetPos, t);
     this.curLook.lerp(this.targetLook, t);
     this.curFov = lerp(this.curFov, this.targetFov, t);
-    if (Math.abs(this.camera.fov - this.curFov) > 0.05) {
-      this.camera.fov = this.curFov;
+    const targetAdjusted = this.getAspectAdjustedFov(this.curFov);
+    if (Math.abs(this.camera.fov - targetAdjusted) > 0.05) {
+      this.camera.fov = targetAdjusted;
       this.camera.updateProjectionMatrix();
     }
 

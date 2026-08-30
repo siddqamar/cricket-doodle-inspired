@@ -7,7 +7,9 @@ import {
   PHYSICS,
   RUNNING,
   TIMING,
+  UNCERTAINTY,
 } from '../config/constants';
+import type { SkinDef } from '../config/skins';
 import { audio } from '../audio/audio';
 import { Camera3D } from '../world/camera3d';
 import {
@@ -22,7 +24,7 @@ import {
   setFielderPose,
   setRunCycle,
 } from '../world/bugs';
-import { buildStadium, createBall } from '../world/stadium';
+import { buildStadium, createBall, animateCrowd } from '../world/stadium';
 import { Fx3D } from '../world/fx3d';
 import { clamp, lerp, randRange } from '../utils/math';
 import { loadHighScore, saveHighScore } from '../utils/storage';
@@ -84,12 +86,15 @@ export class PlayScene3D {
   private swinging = false;
   private batterSwingT = 0;
   private bowlerPhase = 0;
+  private lastShotQuality: 'perfect' | 'good' | 'edge' | null = null;
   private confettiDelay = -1;
   private reducedMotion: boolean;
+  private readonly skin: SkinDef | undefined;
 
   private readonly cam: Camera3D;
   private readonly events: PlayEvents;
   private readonly fx = new Fx3D();
+  private readonly stadium: THREE.Group;
 
   private readonly striker: THREE.Group;
   private readonly partner: THREE.Group;
@@ -138,9 +143,10 @@ export class PlayScene3D {
     elapsed: 0,
   };
 
-  constructor(cam: Camera3D, events: PlayEvents) {
+  constructor(cam: Camera3D, events: PlayEvents, skin?: SkinDef) {
     this.cam = cam;
     this.events = events;
+    this.skin = skin;
     this.reducedMotion = cam.reducedMotion;
 
     // Lights
@@ -159,16 +165,17 @@ export class PlayScene3D {
     this.scene.add(sun);
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.22));
 
-    this.scene.add(buildStadium());
+    this.stadium = buildStadium(skin);
+    this.scene.add(this.stadium);
     this.scene.add(this.fx.group);
 
-    this.striker = createBug('striker', 1.05);
+    this.striker = createBug('striker', 1.05, skin?.palettes.striker, skin?.shellShader);
     this.scene.add(this.striker);
 
-    this.partner = createBug('partner', 1);
+    this.partner = createBug('partner', 1, skin?.palettes.partner, skin?.shellShader);
     this.scene.add(this.partner);
 
-    this.bowler = createBug('bowler', 1.05);
+    this.bowler = createBug('bowler', 1.05, skin?.palettes.bowler, skin?.shellShader);
     this.bowler.position.set(FIELD3D.bowlerX, 0, FIELD3D.bowlerStartZ);
     this.bowler.rotation.y = 0;
     this.scene.add(this.bowler);
@@ -190,7 +197,7 @@ export class PlayScene3D {
       [-14, 6],
     ];
     for (const [x, z] of spots) {
-      const f = createBug('fielder', 0.85 + Math.random() * 0.15);
+      const f = createBug('fielder', 0.85 + Math.random() * 0.15, skin?.palettes.fielder, skin?.shellShader);
       f.position.set(x!, 0, z!);
       f.lookAt(0, 0, 0);
       this.fielders.push(f);
@@ -205,7 +212,7 @@ export class PlayScene3D {
       this.scene.add(f);
     }
 
-    this.ball = createBall();
+    this.ball = createBall(skin?.ballColor);
     this.ball.visible = false;
     this.scene.add(this.ball);
 
@@ -363,6 +370,7 @@ export class PlayScene3D {
     this.batterSwingT = 0;
     this.bowlerPhase = 0;
     this.lastShot = null;
+    this.lastShotQuality = null;
     this.banner = null;
     this.resultHold = TIMING.deadBallHold;
     this.updateDifficultyBlend();
@@ -443,6 +451,7 @@ export class PlayScene3D {
     if (abs <= pw) quality = 'perfect';
     else if (abs <= gw) quality = 'good';
     else quality = 'edge';
+    this.lastShotQuality = quality;
 
     const loftBias = clamp(err / ew, -1, 1);
     let power: number;
@@ -525,8 +534,21 @@ export class PlayScene3D {
       this.runTargetPartnerZ < this.runStartPartnerZ ? Math.PI : 0;
   }
 
+  private updateShaderUniforms(t: number): void {
+    this.scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mat = (obj as THREE.Mesh).material as any;
+        if (mat && mat.uniforms && mat.uniforms.uTime) {
+          mat.uniforms.uTime.value = t;
+        }
+      }
+    });
+  }
+
   update(dt: number, swingPressed: boolean): void {
     this.time += dt;
+    this.updateShaderUniforms(this.time);
+    animateCrowd(this.stadium, this.time, this.cheer);
     if (this.phase !== 'intro' && this.phase !== 'out') {
       this.matchTime += dt;
       this.updateDifficultyBlend();
@@ -717,6 +739,9 @@ export class PlayScene3D {
     this.phaseT += dt;
     this.ballVel.y -= PHYSICS.gravity * dt;
     this.ballPos.addScaledVector(this.ballVel, dt);
+    if (this.ballVel.length() > 10) {
+      this.fx.trail(this.ballPos, this.ballVel, this.skin?.ballColor ?? 0xd62828, this.reducedMotion);
+    }
 
     if (this.ballPos.y < 0.12) {
       this.ballPos.y = 0.12;
@@ -735,22 +760,61 @@ export class PlayScene3D {
     this.updateRunning(dt);
     if (this.updateFielders(dt)) return;
 
-    // Catches — only on the full; bounce makes the ball safe
+    // Probabilistic catching — drops and miracles
     if (
       !this.hasBouncedSinceHit &&
-      this.ballPos.y > FIELDING.catchHeightMin &&
+      this.ballPos.y > UNCERTAINTY.miracleHeightMin &&
       this.ballPos.y < FIELDING.catchHeightMax &&
       this.ballVel.y < 2
     ) {
+      const miracleR = FIELDING.catchRadius * UNCERTAINTY.miracleRadiusMult;
       for (const ai of this.fielderAIs) {
         if (ai.reactionLeft > 0) continue;
         const d = Math.hypot(
           this.ballPos.x - ai.group.position.x,
           this.ballPos.z - ai.group.position.z,
         );
-        if (d < FIELDING.catchRadius && Math.abs(this.ballPos.y - 1.0) < 1.25) {
+        const inCatchZone =
+          d < FIELDING.catchRadius && Math.abs(this.ballPos.y - 1.0) < 1.25;
+        const inMiracleZone =
+          !inCatchZone &&
+          d < miracleR &&
+          this.ballPos.y > FIELDING.catchHeightMin;
+
+        if (inCatchZone) {
+          const isDive = ai.diveT > 0 || d < FIELDING.catchRadius * 0.65;
+          const dropChance =
+            (UNCERTAINTY.dropChanceBase +
+              (isDive ? UNCERTAINTY.dropChanceDive : 0)) *
+            (1 - this.difficultyT * UNCERTAINTY.dropChanceReductionAtMax);
+          if (Math.random() < dropChance) {
+            this.ballVel.y = randRange(2, 5);
+            this.ballVel.x *= 0.3;
+            this.ballVel.z *= 0.3;
+            ai.diveT = 0.5;
+            this.banner = 'DROPPED!';
+            this.fx.burst(this.ballPos.clone(), 0xff4444, 12, this.reducedMotion);
+            audio.click();
+            continue;
+          }
           this.triggerOut('caught');
           return;
+        }
+
+        if (inMiracleZone) {
+          const miracleChance =
+            UNCERTAINTY.miracleChanceBase +
+            (this.lastShotQuality === 'edge' ? UNCERTAINTY.miracleEdgeBoost : 0);
+          if (Math.random() < miracleChance) {
+            ai.diveT = 0.6;
+            this.banner = 'STUNNER!';
+            this.fx.burst(this.ballPos.clone(), 0xffd700, 24, this.reducedMotion);
+            this.fx.confetti(this.ballPos.clone(), 20, this.reducedMotion);
+            this.cam.dramaticZoom(this.ballPos.clone(), 1.0);
+            audio.cheerBig();
+            this.triggerOut('caught');
+            return;
+          }
         }
       }
     }
@@ -924,6 +988,15 @@ export class PlayScene3D {
         (this.ballPos.y <= 0.35 && Math.hypot(this.ballVel.x, this.ballVel.z) < 8);
 
       if (canGather && ballDist < FIELDING.pickupRadius && this.ballPos.y < 1.2) {
+        if (ai.gatherLeft === 0 && Math.random() < UNCERTAINTY.misfieldChance) {
+          ai.diveT = 0.4;
+          this.ballVel.x += randRange(-3, 3);
+          this.ballVel.z += randRange(-2, 2);
+          this.banner = 'MISFIELD!';
+          this.fx.burst(this.ballPos.clone(), 0xff8844, 8, this.reducedMotion);
+          ai.gatherLeft = -1;
+          continue;
+        }
         if (ai.gatherLeft <= 0) {
           ai.gatherLeft = FIELDING.gatherTime;
           // Dive flourish on close saves
@@ -1013,12 +1086,12 @@ export class PlayScene3D {
     this.phaseT = 0;
     this.ballActive = true;
     this.resultHold = kind === 'six' ? TIMING.resultHoldSix : TIMING.resultHoldFour;
-    this.celebrate = kind === 'six' ? 2.2 : 1.4;
-    this.cheer = kind === 'six' ? 1.4 : 1;
+    this.celebrate = kind === 'six' ? 2.5 : 1.8;
+    this.cheer = kind === 'six' ? 2.5 : 1.8;
 
     if (kind === 'six') {
       this.banner = 'SIX!';
-      audio.cheerBig();
+      audio.cheerCrazySix();
       this.cam.addShake(1.9);
       this.cam.setPose({
         pos: CAM3D.six.pos,
@@ -1030,7 +1103,7 @@ export class PlayScene3D {
       this.confettiDelay = 0.3;
     } else {
       this.banner = 'FOUR!';
-      audio.cheer(0.9);
+      audio.cheerCrazyFour();
       this.cam.addShake(1.15);
       this.cam.setPose({
         pos: CAM3D.four.pos,
